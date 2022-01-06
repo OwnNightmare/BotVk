@@ -28,7 +28,7 @@ class VkClient:
         """Получает информацию о профиле вк текущего пользователя"""
         method_name = 'account.getProfileInfo'
         response = requests.get(self.url_methods + method_name, params=self.needed_params)
-        return response.json()
+        return response
 
     def calc_age(self, acc_info):
         birth_info = acc_info['response']['bdate']
@@ -41,7 +41,7 @@ class VkClient:
         return age
 
     def form_portrait(self):
-        data = self.get_acc_info()
+        data = self.get_acc_info().json()
         response = data['response']
         self.portrait['town'] = response.get('home_town')
         self.portrait['sex'] = response.get('sex')
@@ -52,8 +52,15 @@ class VkClient:
     def search(self):
         method_name = 'users.search'
 
+    def mu(self, a, b):
+        return a + b
+
+
+
+
 
 if __name__ == '__main__':
     # VkClient.open_page()
     # user_token = input('Ваш Vk токен: ')
     me = VkClient(VkClient.my_token)
+    print(me.calc_age(me.get_acc_info().json()))
