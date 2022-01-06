@@ -52,12 +52,6 @@ class VkClient:
     def search(self):
         method_name = 'users.search'
 
-    def mu(self, a, b):
-        return a + b
-
-
-
-
 
 if __name__ == '__main__':
     # VkClient.open_page()
