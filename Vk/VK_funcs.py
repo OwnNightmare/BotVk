@@ -1,9 +1,32 @@
 import webbrowser
 import requests
 import datetime
+from typing import Any
+
+def calc_age(acc_info: dict):
+    """acc_info - значение ключа 'response' json ответа Vk API метода account.getProfileInfo"""
+    birth_info = acc_info['bdate']
+    birth_info = birth_info.split('.')
+    birth_info = [int(i) for i in birth_info[::-1]]
+    birthday = datetime.date(birth_info[0], birth_info[1], birth_info[2])
+    curr_date = datetime.date.today()
+    age = curr_date - birthday
+    age = age.days // 364
+    return age
 
 
-class VkClient:
+def form_portrait(acc_info: dict):
+    """acc_info - значение ключа 'response' json ответа Vk API метода account.getProfileInfo"""
+    portrait = {}
+    response = acc_info
+    portrait['town'] = response.get('home_town')
+    portrait['sex'] = response.get('sex')
+    portrait['relation'] = response.get('relation')
+    portrait['age'] = calc_age(response)
+    return portrait
+
+
+class MyVkClass:
 
     app_id = '8044074'
     my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
@@ -14,7 +37,7 @@ class VkClient:
     @classmethod
     def open_page(cls):
         oauth_url = 'https://oauth.vk.com/authorize'
-        params_open = "client_id=8044074&redirect_uri=https://oauth.vk.com/blank.html&scope=65538&display=page&response_type=token"
+        params_open = "client_id=209978754&redirect_uri=https://oauth.vk.com/blank.html&scope=65538&display=page&response_type=token"
         webbrowser.open_new(f"{oauth_url}?{params_open}")
 
     def __init__(self, vk_token):
@@ -31,24 +54,7 @@ class VkClient:
         response = requests.get(self.url_methods + method_name, params=self.needed_params)
         return response
 
-    def calc_age(self, acc_info):
-        birth_info = acc_info['response']['bdate']
-        birth_info = birth_info.split('.')
-        birth_info = [int(i) for i in birth_info[::-1]]
-        birthday = datetime.date(birth_info[0], birth_info[1], birth_info[2])
-        curr_date = datetime.date.today()
-        age = curr_date - birthday
-        age = age.days // 364
-        return age
 
-    def form_portrait(self):
-        data = self.get_acc_info().json()
-        response = data['response']
-        self.portrait['town'] = response.get('home_town')
-        self.portrait['sex'] = response.get('sex')
-        self.portrait['relation'] = response.get('relation')
-        self.portrait['age'] = self.calc_age(data)
-        return self.portrait
 
     def search(self):
         method_name = 'users.search'
@@ -57,5 +63,5 @@ class VkClient:
 if __name__ == '__main__':
     # VkClient.open_page()
     # user_token = input('Ваш Vk токен: ')
-    me = VkClient(VkClient.my_token)
-    print(me.calc_age(me.get_acc_info().json()))
+    me = MyVkClass(MyVkClass.my_token)
+    print(calc_age(me.get_acc_info().json()))
