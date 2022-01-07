@@ -2,6 +2,7 @@ import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.longpoll import VkLongPoll, VkEventType
 import time
+from vk_api.keyboard import *
 from Vk import VK_funcs
 from VK_funcs import calc_age, form_portrait, MyVkClass
 
@@ -28,8 +29,9 @@ def typical_message_params(event):
 
 
 def main():
-    convers = False
     vk_session = vk_api.VkApi(token=bot_token)
+    keyboard = VkKeyboard()
+    keyboard.add_button(label='Мой ID')
     bot_longpool = VkBotLongPoll(vk_session, group_id=group_id)
     long_pool = VkLongPoll(vk_session, group_id=group_id)
     vk = vk_session.get_api()
@@ -41,12 +43,16 @@ def main():
     for event in bot_longpool.listen():
         if event.type == VkBotEventType.MESSAGE_NEW:
             text = event.message.get('text').lower()
+            user_id = event.message.get('from_id')
             if text == 'id':
                 vk.messages.send(**typical_message_params(event),
-                                 message=f"ID страницы: {event.message['from_id']}")
+                                 message=f"ID страницы: {user_id}")
             elif text == 'f':
+                users_get = vk.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
+                print(users_get)
+                print(form_portrait(users_get[0]))
                 vk.messages.send(**typical_message_params(event),
-                                 message='Сервис на стадии разработки')
+                                      message='Сервис на стадии разработки')
             elif text == 'пока':
                 vk.messages.send(**typical_message_params(event), message='До новых встреч =)')
             elif text == 'h':

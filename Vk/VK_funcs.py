@@ -19,7 +19,7 @@ def form_portrait(acc_info: dict):
     """acc_info - значение ключа 'response' json ответа Vk API метода account.getProfileInfo"""
     portrait = {}
     response = acc_info
-    portrait['town'] = response.get('home_town')
+    portrait['city'] = response.get('city').get('title')
     portrait['sex'] = response.get('sex')
     portrait['relation'] = response.get('relation')
     portrait['age'] = calc_age(response)
