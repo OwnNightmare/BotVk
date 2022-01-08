@@ -80,8 +80,6 @@ def choose_photos(query_maker: 'VkApi.method', ids):
     return popular_photos
 
 
-
-
 def main():
     vk_session = vk_api.VkApi(token=bot_token)
     bot_meth = vk_session.method
@@ -134,35 +132,3 @@ def main():
 if __name__ == '__main__':
     main()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    # for event in bot_longpool.listen():
-    #     if event.type == VkBotEventType.MESSAGE_NEW:
-    #         print('new m')
-    #         vk.messages.send(user_id=event.message['from_id'], random_id=get_message_id(), peer_id='-209978754',
-    #                          message='https://oauth.vk.com/authorize?client_id=8044074&redirect_uri=https://oauth.vk.com/blank.html&scope=65538&display=mobile&response_type=token')
-
-
-
-
-
-
-# if __name__ == '__main__':
-#     main()
