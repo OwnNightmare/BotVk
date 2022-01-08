@@ -4,11 +4,13 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 import time
 from vk_api.keyboard import *
 from Vk import VK_funcs
-from VK_funcs import calc_age, searching_portrait, MyVkClass
+from VK_funcs import calc_age, searching_portrait, MyVkClass, get_ids, prepare_attachment
 from pprint import pprint
 
+me = MyVkClass(MyVkClass.my_token)
 bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'
 group_id = 209978754
+att = [{'type': 'link', 'url': 'https://vk.com/'}]
 
 
 def get_message_id():
@@ -33,7 +35,7 @@ def main():
     vk_session = vk_api.VkApi(token=bot_token)
     bot_longpool = VkBotLongPoll(vk_session, group_id=group_id)
     long_pool = VkLongPoll(vk_session, group_id=group_id)
-    vk = vk_session.get_api()
+    api = vk_session.get_api()
     vk_user = vk_api.VkApi(token=MyVkClass.my_token)
     vk_user = vk_user.get_api()
     profile_info = vk_user.account.getProfileInfo()
@@ -44,27 +46,25 @@ def main():
             text = event.message.get('text').lower()
             user_id = event.message.get('from_id')
             if text == 'id':
-                vk.messages.send(**typical_message_params(event),
+                api.messages.send(**typical_message_params(event),
                                  message=f"ID страницы: {user_id}")
             elif text == 'f':
-                users_get = vk.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
-                print(users_get)
+                users_get = api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
                 searching_person = searching_portrait(users_get[0])
-                print(searching_person)
-                users_search = vk_user.users.search(sort=0, count=10, fields=['photo_max_orig', 'relation'],
-                                                    **searching_person)
-                pprint(users_search)
-
-                vk.messages.send(**typical_message_params(event),
-                                      message='Сервис на стадии разработки')
+                found_users = vk_user.users.search(sort=0, count=3, **searching_person, fields='photo_id')
+                ids = get_ids(found_users)
+                pprint(me.call_api_method('photos.get', ids))
+                api.messages.send(**typical_message_params(event),
+                                 attachment=[f'photo1_456264771'],
+                                 message='Це Дуров, https://vk.com/id000000001''))')
             elif text == 'пока':
-                vk.messages.send(**typical_message_params(event), message='Пока =)')
+                api.messages.send(**typical_message_params(event), message='Пока =)')
             elif text == 'h':
-                vk.messages.send(**typical_message_params(event), message=show_help())
+                api.messages.send(**typical_message_params(event), message=show_help())
             else:
-                vk.messages.send(**typical_message_params(event), message=f"Команда неизвестна")
+                api.messages.send(**typical_message_params(event), message=f"Команда неизвестна")
                 time.sleep(0.5)
-                vk.messages.send(**typical_message_params(event), message=show_help())
+                api.messages.send(**typical_message_params(event), message=show_help())
 
     # for event in bot_longpool.listen():
     #     # while convers:
