@@ -1,3 +1,6 @@
 .idea
 Vk/.pytest_cache/
 Vk/__pycache__/
+ App_requirments.txt
+Vk/errors_log.txt
+Vk/new_file.json

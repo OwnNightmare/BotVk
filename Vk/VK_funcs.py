@@ -47,10 +47,6 @@ def get_ids(found_users: dict):
     список пользователей доступен по ключу 'items' """
     users_list = found_users['items']
     ids = [user['id'] for user in users_list]
-    # prepared_list = []
-    # for user in users_list:
-    #     temp_dict = {'name': f"{user.get('first_name')} {user.get('last_name')}", 'user_url': f"{vk_url}id{user['id']}"}
-    #     prepared_list.append(temp_dict)
     return ids
 
 
