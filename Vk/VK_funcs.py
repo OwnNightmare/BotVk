@@ -92,15 +92,15 @@ class MyVkClass:
                              'v': '5.131'}
         self.portrait = {}
 
-    def call_api_method(self, method_name, ids=None):
-        """Получает информацию о профиле вк текущего пользователя
-        Или получает фото, для id, переданных в списке ids """
+    def make_ids_list(self, method_name, **kwargs):
+        """Шаблон вызова Vk API метода
+         method_name - имя метода"""
         if method_name == 'getProfileInfo':
             response = requests.get(self.url_methods + method_name, params=self.usual_params)
             return response
         elif method_name == 'photos.get':
             photos = []
-            for user_id in ids:
+            for user_id in kwargs['ids']:
                 self.photo_params['owner_id'] = user_id
                 photos.append(requests.get(self.url_methods + method_name, params=self.photo_params).json())
             return photos
