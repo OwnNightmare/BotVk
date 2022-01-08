@@ -15,15 +15,27 @@ def calc_age(acc_info: dict):
     return age
 
 
-def form_portrait(acc_info: dict):
+def searching_portrait(acc_info: dict):
     """acc_info - значение ключа 'response' json ответа Vk API метода account.getProfileInfo"""
-    portrait = {}
+    searching_portrait = {}
     response = acc_info
-    portrait['city'] = response.get('city').get('title')
-    portrait['sex'] = response.get('sex')
-    portrait['relation'] = response.get('relation')
-    portrait['age'] = calc_age(response)
-    return portrait
+    searching_portrait['city'] = response.get('city').get('id')
+    searching_portrait['status'] = response.get('relation')
+    own_age = calc_age(response)
+    sex = response.get('sex')
+    if sex == 2:
+        searching_portrait['sex'] = 1
+        searching_portrait['age_from'] = own_age - 2
+        searching_portrait['age_to'] = own_age
+    elif sex == 1:
+        searching_portrait['sex'] = 2
+        searching_portrait['age_from'] = own_age - 1
+        searching_portrait['age_to'] = own_age + 2
+    else:
+        searching_portrait['sex'] = ''
+        searching_portrait['age_from'] = own_age - 1
+        searching_portrait['age_to'] = own_age + 1
+    return searching_portrait
 
 
 class MyVkClass:
@@ -37,7 +49,7 @@ class MyVkClass:
     @classmethod
     def open_page(cls):
         oauth_url = 'https://oauth.vk.com/authorize'
-        params_open = "client_id=209978754&redirect_uri=https://oauth.vk.com/blank.html&scope=65538&display=page&response_type=token"
+        params_open = "client_id=8044074&redirect_uri=https://oauth.vk.com/blank.html&scope=65538&display=page&response_type=token"
         webbrowser.open_new(f"{oauth_url}?{params_open}")
 
     def __init__(self, vk_token):

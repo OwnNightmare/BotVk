@@ -4,7 +4,8 @@ from vk_api.longpoll import VkLongPoll, VkEventType
 import time
 from vk_api.keyboard import *
 from Vk import VK_funcs
-from VK_funcs import calc_age, form_portrait, MyVkClass
+from VK_funcs import calc_age, searching_portrait, MyVkClass
+from pprint import pprint
 
 bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'
 group_id = 209978754
@@ -30,15 +31,13 @@ def typical_message_params(event):
 
 def main():
     vk_session = vk_api.VkApi(token=bot_token)
-    keyboard = VkKeyboard()
-    keyboard.add_button(label='Мой ID')
     bot_longpool = VkBotLongPoll(vk_session, group_id=group_id)
     long_pool = VkLongPoll(vk_session, group_id=group_id)
     vk = vk_session.get_api()
     vk_user = vk_api.VkApi(token=MyVkClass.my_token)
     vk_user = vk_user.get_api()
     profile_info = vk_user.account.getProfileInfo()
-    user_portrait = form_portrait(profile_info)
+    user_portrait = searching_portrait(profile_info)
 
     for event in bot_longpool.listen():
         if event.type == VkBotEventType.MESSAGE_NEW:
@@ -50,11 +49,16 @@ def main():
             elif text == 'f':
                 users_get = vk.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
                 print(users_get)
-                print(form_portrait(users_get[0]))
+                searching_person = searching_portrait(users_get[0])
+                print(searching_person)
+                users_search = vk_user.users.search(sort=0, count=10, fields=['photo_max_orig', 'relation'],
+                                                    **searching_person)
+                pprint(users_search)
+
                 vk.messages.send(**typical_message_params(event),
                                       message='Сервис на стадии разработки')
             elif text == 'пока':
-                vk.messages.send(**typical_message_params(event), message='До новых встреч =)')
+                vk.messages.send(**typical_message_params(event), message='Пока =)')
             elif text == 'h':
                 vk.messages.send(**typical_message_params(event), message=show_help())
             else:
