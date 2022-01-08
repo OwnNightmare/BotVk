@@ -4,3 +4,5 @@ Vk/__pycache__/
  App_requirments.txt
 Vk/errors_log.txt
 Vk/new_file.json
+Vk/chosen_photos_data.json
+Vk/all_photos_sorted.json

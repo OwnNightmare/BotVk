@@ -42,10 +42,9 @@ def searching_portrait(acc_info: dict):
     return searching_portrait
 
 
-def get_ids(found_users: dict):
-    """ found_users -  успешный результат выполнения метода users.search,
+def get_ids(users_list: list):
+    """ users_list -  список словарей, где каждый - данные о найденном пользователе
     список пользователей доступен по ключу 'items' """
-    users_list = found_users['items']
     ids = [user['id'] for user in users_list]
     return ids
 

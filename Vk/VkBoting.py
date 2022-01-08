@@ -33,6 +33,16 @@ def typical_message_params(event):
     return params
 
 
+def filter_closed(response_obj):
+    """response_obj - успешный ответ users.search метода"""
+    filtered_users = []
+    for user in response_obj['items']:
+        if user['can_access_closed']:
+            filtered_users.append(user)
+    return filtered_users
+
+
+
 def choose_photos(query_maker: 'VkApi.method', ids):
     """
     query_maker - bound method VkApi.method, должен иметь ключ пользователя
@@ -53,20 +63,22 @@ def choose_photos(query_maker: 'VkApi.method', ids):
         with open('all_photos_sorted.json', mode='w') as f:
             json.dump(sorted_photos, f, indent=2)
 
-    for user in sorted_photos:
+    user_count = 0
+    for user in sorted_photos[::-1]:
         foto_count = 0
+        if user_count == 3:
+            break
         for photo in user:
             popular_photos.append({'owner_id': photo['owner_id'], 'photo_id': photo['id']})
             foto_count += 1
             if foto_count == 3:
                 break
+        user_count += 1
 
     with open('chosen_photos_data.json', mode='w') as f:
         json.dump(popular_photos, f, indent=2)
 
-
-
-
+    return popular_photos
 
 
 
@@ -84,39 +96,41 @@ def main():
     user_portrait = searching_portrait(profile_info)
 
     for event in bot_longpool.listen():
-        try:
-            if event.type == VkBotEventType.MESSAGE_NEW:
-                text = event.message.get('text').lower()
-                user_id = event.message.get('from_id')
-                if text == 'id':
-                    api.messages.send(**typical_message_params(event),
-                                     message=f"ID страницы: {user_id}")
-                elif text == 'f':
-                    users_get = api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
-                    searching_person = searching_portrait(users_get[0])
-                    found_users = vk_user.users.search(sort=0, count=3, is_closed=False, **searching_person,
-                                                       fields='photo_id')
-                    pprint(found_users)
-                    ids = get_ids(found_users)
-                    photos = choose_photos(user_meth, ids)
-                    print('hey')
-                    # bot_meth('messages.send', values={**typical_message_params(event), 'attachment': 'photo1_456264771',
-                    #                                    'message': 'Привет'})
-                    # api.messages.send(**typical_message_params(event),
-                    #                  attachment=[f'photo1_456264771'],
-                    #                  message='Це Дуров, https://vk.com/id000000001''))')
-                elif text == 'пока':
-                    api.messages.send(**typical_message_params(event), message='Пока =)')
-                elif text == 'h':
-                    api.messages.send(**typical_message_params(event), message=show_help())
-                else:
-                    api.messages.send(**typical_message_params(event), message=f"Команда неизвестна")
-                    time.sleep(0.5)
-                    api.messages.send(**typical_message_params(event), message=show_help())
-        except BaseException as er:
-            with open('errors_log.txt', 'a') as f:
-                now = datetime.now()
-                f.writelines([str(er), str(now), '\n'])
+        if event.type == VkBotEventType.MESSAGE_NEW:
+            text = event.message.get('text').lower()
+            user_id = event.message.get('from_id')
+            if text == 'id':
+                api.messages.send(**typical_message_params(event),
+                                 message=f"ID страницы: {user_id}")
+            elif text == 'f':
+                api.messages.send(**typical_message_params(event),
+                                  message=f"ID страницы: {user_id}",
+                                  attachment=['photo1_456264771', 'photo1_456264771', 'photo1_456264771'])
+                users_get = api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
+                searching_person = searching_portrait(users_get[0])
+                found_users = vk_user.users.search(sort=0, count=20, is_closed=False, **searching_person,
+                                                   fields='photo_id')
+                filtered_users = filter_closed(found_users)
+                pprint(filtered_users)
+                ids = get_ids(filtered_users)
+                owner_and_photo = choose_photos(user_meth, ids)
+                pprint(owner_and_photo)
+
+                # api.messages.send(**typical_message_params(event),
+                #                  attachment=[f'photo1_456264771'],
+                #                  message='Це Дуров, https://vk.com/id000000001''))')
+            elif text == 'пока':
+                api.messages.send(**typical_message_params(event), message='Пока =)')
+            elif text == 'h':
+                api.messages.send(**typical_message_params(event), message=show_help())
+            else:
+                api.messages.send(**typical_message_params(event), message=f"Команда неизвестна")
+                time.sleep(0.5)
+                api.messages.send(**typical_message_params(event), message=show_help())
+        # except BaseException as er:
+        #     with open('errors_log.txt', 'a') as f:
+        #         now = datetime.now()
+        #         f.writelines([str(er), str(now), '\n'])
 
 
 if __name__ == '__main__':
