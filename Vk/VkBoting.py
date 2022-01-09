@@ -100,11 +100,12 @@ def main():
             if event.type == VkBotEventType.MESSAGE_NEW:
                 text = event.message.get('text').lower()
                 user_id = event.message.get('from_id')
+                print(f"{user_id} started chat")
                 if text == 'id':
                     group_api.messages.send(**typical_message_params(event),
                                             message=f"ID страницы: {user_id}")
                 elif text == 'f':
-                    count = 75
+                    count = 79
                     group_api.messages.send(**typical_message_params(event),
                         message=f'Идет поиск...\nСреднее время поиска {int(count * 0.4)} секунд\n'
                                 f'Пожалуйста, подождите =)')
@@ -119,6 +120,8 @@ def main():
                         filtered_users = filter_closed(found_users)
                         ids = get_ids(filtered_users)
                         photo_array = choose_photos(main_user.method, ids)
+                        group_api.messages.send(**typical_message_params(event), message='Поиск окончен, высылаем фото')
+                        time.sleep(0.7)
                         send_photos(group_api, event, photo_array)
                         finish = datetime.now()
                         with open('search_time.txt', 'a') as f:

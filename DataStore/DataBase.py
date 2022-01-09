@@ -1,8 +1,16 @@
-a = [(1, [1, 3,4])]
-b = [1,2,3,4,5,6,7,8,9]
-c = b[0::3]
-m = 2
+import sqlalchemy
+from sqlalchemy import MetaData, Table, Integer, String, ForeignKey, PrimaryKeyConstraint, Column
+
+db = 'postgresql://postgres:1710@localhost:5432/vkdb'
+engine = sqlalchemy.create_engine(db)
+connect = engine.connect()
+engine = sqlalchemy.create_engine(db)
+metadadta_obj = MetaData()
+
+Users = Table('users', metadadta_obj,
+              Column('id', Integer, primary_key=True),
+              Column('name', String))
 
 
-a = [[""]]
-print(len(a))
+People = Table('people', metadadta_obj,
+               Column('vk_id'), Integer, primary_key=True)

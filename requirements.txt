@@ -12,3 +12,4 @@ requests==2.22.0
 toml==0.10.2
 urllib3==1.25.11
 vk-api==11.9.7
+SQLAlchemy~=1.4.29
