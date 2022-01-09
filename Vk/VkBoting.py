@@ -16,8 +16,8 @@ att = [{'type': 'link', 'url': 'https://vk.com/'}]
 
 
 def get_message_id():
-    ms = int(time.time())
-    return ms
+    mcrs = int(time.time() * 1000)
+    return mcrs
 
 
 def show_help():
@@ -42,6 +42,25 @@ def filter_closed(response_obj):
     return filtered_users
 
 
+def dec_photos(choose_photos_func):
+    def wrap(*args, **kwargs):
+        collage = []
+        owners = []
+        obj = 'photo'
+        result = choose_photos_func(*args, **kwargs)
+        for dic in result:
+            collage.append(f"{obj}{dic['owner_id']}_{dic['photo_id']}")
+            owners.append(dic['owner_id'])
+        zipped = list(zip(owners, collage))
+
+        with open('owner_and_photo.json', 'w') as f:
+            json.dump(zipped, f, indent=2)
+
+        return zipped
+    return wrap
+
+
+@dec_photos
 def choose_photos(query_maker: 'VkApi.method', ids):
     """
     query_maker - bound method VkApi.method, должен иметь ключ пользователя
@@ -65,7 +84,7 @@ def choose_photos(query_maker: 'VkApi.method', ids):
     user_count = 0
     for user in sorted_photos[::-1]:
         foto_count = 0
-        if user_count == 3:
+        if user_count > 3:
             break
         for photo in user:
             popular_photos.append({'owner_id': photo['owner_id'], 'photo_id': photo['id']})
@@ -73,10 +92,8 @@ def choose_photos(query_maker: 'VkApi.method', ids):
             if foto_count == 3:
                 break
         user_count += 1
-
     with open('chosen_photos_data.json', mode='w') as f:
         json.dump(popular_photos, f, indent=2)
-
     return popular_photos
 
 
@@ -101,18 +118,25 @@ def main():
                     api.messages.send(**typical_message_params(event),
                                      message=f"ID страницы: {user_id}")
                 elif text == 'f':
-                    api.messages.send(**typical_message_params(event),
-                                      message=f"ID страницы: {user_id}",
-                                      attachment=['photo1_456264771', 'photo1_456264771', 'photo1_456264771'])
+                    api.messages.send(**typical_message_params(event), message='Ищем пару...')
                     users_get = api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
                     searching_person = searching_portrait(users_get[0])
-                    found_users = vk_user.users.search(sort=0, count=20, is_closed=False, **searching_person,
+                    found_users = vk_user.users.search(sort=0, count=20,  **searching_person,
                                                        fields='photo_id')
                     filtered_users = filter_closed(found_users)
-                    pprint(filtered_users)
                     ids = get_ids(filtered_users)
-                    owner_and_photo = choose_photos(user_meth, ids)
-                    pprint(owner_and_photo)
+                    oID_pID = choose_photos(user_meth, ids)
+                    step = 0
+                    slice_start = 0
+                    slice_stop = 3
+                    for i in range(len(oID_pID) // 3):
+                        api.messages.send(**typical_message_params(event),
+                        attachment=[i[1] for i in oID_pID[slice_start:slice_stop]],
+                        message=f"https://vk.com/id{oID_pID[step][0]}")
+                        time.sleep(1)
+                        slice_stop +=3
+                        slice_start += 3
+                        step +=1
                 elif text == 'пока':
                     api.messages.send(**typical_message_params(event), message='Пока =)')
                 elif text == 'h':
