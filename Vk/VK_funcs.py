@@ -1,5 +1,7 @@
 import datetime
 
+my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
+
 
 class MyVkClass:
 
@@ -25,8 +27,14 @@ class MyVkClass:
 
 def calc_age(acc_info: dict):
     """acc_info - значение ключа 'response' json ответа Vk API метода account.getProfileInfo"""
-    birth_info = acc_info['bdate']
+    birth_info = acc_info.get('bdate')
+    if not birth_info:
+        print('Нет ключа bdate')
+        return
     birth_info = birth_info.split('.')
+    if len(birth_info) < 3:
+        print('Формат даты получен неверно')
+        return
     birth_info = [int(i) for i in birth_info[::-1]]
     birthday = datetime.date(birth_info[0], birth_info[1], birth_info[2])
     curr_date = datetime.date.today()
@@ -35,7 +43,7 @@ def calc_age(acc_info: dict):
     return age
 
 
-def searching_portrait(acc_info: dict):
+def make_searching_portrait(acc_info: dict):
     """ Возвращает "портрет" искомого человека, составленный на основании acc_info.
     acc_info - значение ключа 'response'  успешного json ответа Vk API метода account.getProfileInfo"""
     _portrait = {}
@@ -43,33 +51,43 @@ def searching_portrait(acc_info: dict):
     _portrait['city'] = response.get('city').get('id')
     _portrait['status'] = response.get('relation')
     own_age = calc_age(response)
-    sex = response.get('sex')
-    if sex == 2:
-        _portrait['sex'] = 1
-        _portrait['age_from'] = own_age - 2
-        _portrait['age_to'] = own_age
-    elif sex == 1:
-        _portrait['sex'] = 2
-        _portrait['age_from'] = own_age - 1
-        _portrait['age_to'] = own_age + 2
-    else:
-        _portrait['sex'] = ''
-        _portrait['age_from'] = own_age - 1
-        _portrait['age_to'] = own_age + 1
-    return _portrait
+    if own_age:
+        sex = response.get('sex')
+        if str(sex).isdigit():
+            if int(sex) == 2:
+                _portrait['sex'] = 1
+                _portrait['age_from'] = own_age - 2
+                _portrait['age_to'] = own_age
+            elif sex == 1:
+                _portrait['sex'] = 2
+                _portrait['age_from'] = own_age - 1
+                _portrait['age_to'] = own_age + 2
+            else:
+                _portrait['sex'] = ''
+                _portrait['age_from'] = own_age - 1
+                _portrait['age_to'] = own_age + 1
+            return _portrait
+        else:
+            print('Пол не получен')
+            return
 
 
 def get_ids(users_list: list):
     """ users_list - список словарей, где каждый - данные о найденном пользователе
     список пользователей доступен по ключу 'items' """
-    ids = [user['id'] for user in users_list]
-    return ids
+    if len(users_list) > 2:
+        ids = [user['id'] for user in users_list]
+        return ids
+    print('В  get_ids() получено недостаточно id')
+    return
 
 
 if __name__ == '__main__':
+    i = '1243432/4545'
+    print(i.strip('/'))
     # VkClient.open_page()
     # user_token = input('Ваш Vk токен: ')
-    me = MyVkClass(MyVkClass.my_token)
+    # me = MyVkClass(MyVkClass.my_token)
 
     # @classmethod
     # def open_page(cls):

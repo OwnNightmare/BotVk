@@ -14,3 +14,9 @@ class TestVkApi:
     def test_calc_age(self):
         """Тест функции вычисления возраста"""
 
+
+
+
+
+
+
