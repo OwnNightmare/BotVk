@@ -5,12 +5,12 @@ db = 'postgresql://postgres:1710@localhost:5432/vkdb'
 engine = sqlalchemy.create_engine(db)
 connect = engine.connect()
 engine = sqlalchemy.create_engine(db)
-metadadta_obj = MetaData()
+metadata_obj = MetaData()
 
-Users = Table('users', metadadta_obj,
+Users = Table('users', metadata_obj,
               Column('id', Integer, primary_key=True),
               Column('name', String))
 
 
-People = Table('people', metadadta_obj,
+People = Table('people', metadata_obj,
                Column('vk_id'), Integer, primary_key=True)

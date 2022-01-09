@@ -44,7 +44,6 @@ def choose_photos(query_maker: vk_api.VkApi.method, ids):
     ids - список ID страниц, у которых нужно запросить фото через photos.get"""
     resp_obj_store = []  # Список для объектов успешного ответа photos.get, все фото 1 пользователя и метаданные к ним
     sorted_photos = []
-    users_photos = []
     owner_and_photos = []
     shuffle(ids)
     for user_id in ids:
@@ -70,7 +69,7 @@ def choose_photos(query_maker: vk_api.VkApi.method, ids):
                 break
             users_photos.append(f"photo{photo['owner_id']}_{photo['id']}")
             foto_count += 1
-        if photo.get('owner_id') is not None and len(str(photo['owner_id'])) > 0:
+        if photo.get('owner_id') and len(str(photo['owner_id'])) > 0:
             if len(users_photos) >= 3:
                 owner_and_photos.append((photo['owner_id'], users_photos))
                 user_count += 1
@@ -91,12 +90,12 @@ def send_photos(query_maker, event, array):
 def main():
     main_user = vk_api.VkApi(token=my_token)
     main_bot = vk_api.VkApi(token=bot_token)
-    bot_longpool = VkBotLongPoll(main_bot, group_id=group_id)
+    bot_long_pool = VkBotLongPoll(main_bot, group_id=group_id)
     group_api = main_bot.get_api()
     user_api = main_user.get_api()
 
-    for event in bot_longpool.listen():
-        # try:
+    for event in bot_long_pool.listen():
+        try:
             if event.type == VkBotEventType.MESSAGE_NEW:
                 text = event.message.get('text').lower()
                 user_id = event.message.get('from_id')
@@ -135,12 +134,12 @@ def main():
                     group_api.messages.send(**typical_message_params(event), message=f"Команда неизвестна")
                     time.sleep(0.5)
                     group_api.messages.send(**typical_message_params(event), message=show_help())
-        # except BaseException as er:
-        #     with open('errors_log.txt', 'a') as f:
-        #         now = datetime.now()
-        #         f.writelines([str(er), str(now), '\n'])
-        #         print(er.with_traceback(None))
-        #         return
+        except BaseException as er:
+            with open('errors_log.txt', 'a') as f:
+                now = datetime.now()
+                f.writelines([str(er), str(now), '\n'])
+                print(er.with_traceback(None))
+                return
 
 
 if __name__ == '__main__':
