@@ -1,19 +1,19 @@
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
-from vk_api.longpoll import VkLongPoll, VkEventType
 import time
 from datetime import datetime
 from VK_funcs import make_searching_portrait, get_ids, my_token
 import json
 from random import shuffle
+# from vk_api.longpoll import VkLongPoll, VkEventType
 
 bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'
 group_id = 209978754
 
 
 def get_message_id():
-    mcrs = int(time.time() * 1000)
-    return mcrs
+    microseconds = int(time.time() * 1000)
+    return microseconds
 
 
 def show_help():
@@ -38,7 +38,7 @@ def filter_closed(response_obj):
     return filtered_users
 
 
-def choose_photos(query_maker: 'VkApi.method', ids):
+def choose_photos(query_maker: vk_api.VkApi.method, ids):
     """
     query_maker - bound method VkApi.method, должен иметь ключ пользователя
     ids - список ID страниц, у которых нужно запросить фото через photos.get"""
@@ -111,7 +111,7 @@ def main():
                     features = make_searching_portrait(users_get[0])
                     if features:
                         beginning = datetime.now()
-                        count = 22
+                        count = 34
                         found_users = user_api.users.search(sort=0, count=count, **features,
                                                             fields='photo_id')
                         filtered_users = filter_closed(found_users)
@@ -140,4 +140,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
