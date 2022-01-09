@@ -73,7 +73,7 @@ def make_searching_portrait(acc_info: dict):
 
 
 def get_ids(users_list: list):
-    """ users_list - список словарей, где каждый - данные о найденном пользователе
+    """ users_list (закрытые аккаунты отфильтрованы) - список словарей, где каждый - данные о найденном пользователе
     список пользователей доступен по ключу 'items' """
     if len(users_list) > 2:
         ids = [user['id'] for user in users_list]

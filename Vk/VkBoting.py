@@ -63,7 +63,7 @@ def choose_photos(query_maker: vk_api.VkApi.method, ids):
     for user in sorted_photos:
         users_photos = []
         foto_count = 0
-        if user_count > 2:
+        if user_count > 4:
             return owner_and_photos
         for photo in user:
             if foto_count > 2:
@@ -104,14 +104,16 @@ def main():
                     group_api.messages.send(**typical_message_params(event),
                                             message=f"ID страницы: {user_id}")
                 elif text == 'f':
-                    group_api.messages.send(**typical_message_params(event), message='Ищем пару...')
+                    count = 75
+                    group_api.messages.send(**typical_message_params(event),
+                        message=f'Идет поиск...\nСреднее время поиска {int(count * 0.4)} секунд\n'
+                                f'Пожалуйста, подождите =)')
                     users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
                     with open('vk_self_info.json', 'w') as f:
                         json.dump(users_get, f, indent=2, ensure_ascii=False)
                     features = make_searching_portrait(users_get[0])
                     if features:
                         beginning = datetime.now()
-                        count = 34
                         found_users = user_api.users.search(sort=0, count=count, **features,
                                                             fields='photo_id')
                         filtered_users = filter_closed(found_users)
