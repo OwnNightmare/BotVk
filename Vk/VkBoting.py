@@ -3,16 +3,13 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from vk_api.longpoll import VkLongPoll, VkEventType
 import time
 from datetime import datetime
-from vk_api.keyboard import *
-from Vk import VK_funcs
-from VK_funcs import calc_age, searching_portrait, MyVkClass, get_ids, prepare_attachment
-from pprint import pprint
+# from vk_api.keyboard import *
+from VK_funcs import calc_age, searching_portrait, MyVkClass, get_ids
 import json
 
 me = MyVkClass(MyVkClass.my_token)
 bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'
 group_id = 209978754
-att = [{'type': 'link', 'url': 'https://vk.com/'}]
 
 
 def get_message_id():
@@ -43,6 +40,10 @@ def filter_closed(response_obj):
 
 
 def dec_photos(choose_photos_func):
+    """Принимает функцию choose_photos
+    Формирует список строк с данными о фото, в формате photo<owner_id>_<photo_id> для использования в attachments,
+    формирует список владельцев, возвращает list(zip(list1, list2))
+    '"""
     def wrap(*args, **kwargs):
         collage = []
         owners = []

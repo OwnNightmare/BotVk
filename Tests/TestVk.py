@@ -10,8 +10,6 @@ class TestVkApi:
 
     def test_get_acc_info(self):
         """Тест получения информации о самом пользователе"""
-        assert TestVkApi.test_user.make_ids_list().status_code == 200
-        assert TestVkApi.test_user.make_ids_list().json().get('response') is not None
 
     def test_calc_age(self):
         """Тест функции вычисления возраста"""
