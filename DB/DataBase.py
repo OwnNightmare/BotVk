@@ -54,10 +54,7 @@ def clear_db():
                         DELETE FROM users;""")
 
 
-if __name__ == '__main__':
-    sel = connection.execute("""SELECT candidate_id
-                                FROM people""").fetchall()
-    print(type(sel[0]))
+
 
 
 
