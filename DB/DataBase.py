@@ -1,5 +1,6 @@
 import sqlalchemy
-from sqlalchemy import MetaData, Table, Integer, String, ForeignKey, delete, Column, insert, PrimaryKeyConstraint
+from sqlalchemy import MetaData, Table, Integer, String, ForeignKey,\
+    delete, Column, insert, PrimaryKeyConstraint, select
 from sqlalchemy.dialects.postgresql import insert as insert_psql
 
 
@@ -20,6 +21,7 @@ def create_tables():
                    PrimaryKeyConstraint('candidate_id', 'user_id', name='pk_pair'))
 
     metadata_obj.create_all(engine)
+
 
     # inst_stmt = insert_psql(Users).values(id=1232412, name='Борисов Юра')
     # do_nothing_on = inst_stmt.on_conflict_do_nothing(
@@ -48,9 +50,14 @@ def ins_into_people(**kwargs):
 
 
 def clear_db():
-    connection.execute(f"""DELETE FROM users;
-                        DELETE FROM people;""")
+    connection.execute(f"""DELETE FROM people;
+                        DELETE FROM users;""")
 
+
+if __name__ == '__main__':
+    sel = connection.execute("""SELECT candidate_id
+                                FROM people""").fetchall()
+    print(type(sel[0]))
 
 
 

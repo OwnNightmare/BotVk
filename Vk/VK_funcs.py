@@ -1,4 +1,5 @@
 import datetime
+import sqlalchemy.engine.row
 
 my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
 
@@ -24,6 +25,14 @@ my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b
 #                              'v': '5.131'}
 #         self.portrait = {}
 
+
+def flat_sql_row(array):
+    for item in array:
+        if isinstance(item, (sqlalchemy.engine.row.LegacyRow, list, tuple)):
+            for sub_item in flat_sql_row(item):
+                yield sub_item
+        else:
+            yield item
 
 def calc_age(acc_info: dict):
     """acc_info - значение ключа 'response' json ответа Vk API метода account.getProfileInfo"""
@@ -72,19 +81,12 @@ def make_searching_portrait(acc_info: dict):
             return
 
 
-def get_ids(users_list: list):
-    """ users_list (закрытые аккаунты отфильтрованы) - список словарей, где каждый - данные о найденном пользователе
-    список пользователей доступен по ключу 'items' """
-    if len(users_list) > 2:
-        ids = [user['id'] for user in users_list]
-        return ids
-    print('В  get_ids() получено недостаточно id')
-    return
-
-
 if __name__ == '__main__':
-    i = '1243432/4545'
-    print(i.strip('/'))
+    a = {1, 2, 4}
+    c = [2, 4, 4, 4]
+    print(list(a.difference(c)))
+    # i = '1243432/4545'
+    # print(i.strip('/'))
     # VkClient.open_page()
     # user_token = input('Ваш Vk токен: ')
     # me = MyVkClass(MyVkClass.my_token)

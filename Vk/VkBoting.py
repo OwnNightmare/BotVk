@@ -1,8 +1,9 @@
+import sqlalchemy.engine.row
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import time
 from datetime import datetime
-from VK_funcs import make_searching_portrait, get_ids, my_token
+from VK_funcs import make_searching_portrait, my_token, flat_sql_row
 import json
 from random import shuffle
 # from vk_api.longpoll import VkLongPoll, VkEventType
@@ -38,6 +39,22 @@ def filter_closed(response_obj):
     return filtered_users
 
 
+def get_ids(pairs_list: list):
+    """@users_list (закрытые аккаунты отфильтрованы) - список словарей, где каждый - данные о найденном пользователе.
+    Возвращает список id-страниц, которых нет в базе """
+
+    records = DataBase.connection.execute(f"""SELECT candidate_id 
+                                FROM people
+                                """).fetchall()
+    found_ids = [u['id'] for u in pairs_list]
+    if len(records) > 0:
+        seen_ids = [i for i in flat_sql_row(records)]
+        new_ids = list(set(found_ids).difference(seen_ids))
+        return new_ids
+    else:
+        return found_ids
+
+
 def choose_photos(query_maker: vk_api.VkApi.method, ids):
     """
     query_maker - bound method VkApi.method, должен иметь ключ пользователя
@@ -62,19 +79,19 @@ def choose_photos(query_maker: vk_api.VkApi.method, ids):
     for user in sorted_photos:
         users_photos = []
         foto_count = 0
-        if user_count > 4:
-            return owner_and_photos
+        if user_count > 3:
+            break
         for photo in user:
             if foto_count > 2:
                 break
             users_photos.append(f"photo{photo['owner_id']}_{photo['id']}")
             foto_count += 1
-        if photo.get('owner_id') and len(str(photo['owner_id'])) > 0:
             if len(users_photos) >= 3:
                 owner_and_photos.append((photo['owner_id'], users_photos))
                 user_count += 1
                 with open('ids array.json', mode='w') as f:
                     json.dump(owner_and_photos, f, indent=2)
+    return owner_and_photos
 
 
 def send_and_insert_db(query_maker, event, array, user_id):
@@ -89,6 +106,7 @@ def send_and_insert_db(query_maker, event, array, user_id):
 
 
 def main():
+    DataBase.clear_db()
     main_user = vk_api.VkApi(token=my_token)
     main_bot = vk_api.VkApi(token=bot_token)
     bot_long_pool = VkBotLongPoll(main_bot, group_id=group_id)
@@ -97,54 +115,49 @@ def main():
     DataBase.create_tables()
 
     for event in bot_long_pool.listen():
-        try:
-            if event.type == VkBotEventType.MESSAGE_NEW:
-                text = event.message.get('text').lower()
-                user_id = event.message.get('from_id')
-                print(f"user {user_id} taken")
-                DataBase.ins_into_users(id=user_id, name='Юрий Борисов')
-                if text == 'id':
-                    group_api.messages.send(**typical_message_params(event),
-                                            message=f"ID страницы: {user_id}")
-                elif text == 'f':
-                    count = 79
-                    group_api.messages.send(**typical_message_params(event),
-                        message=f'Идет поиск...\nСреднее время поиска {int(count * 0.4)} секунд\n'
-                                f'Пожалуйста, подождите =)')
-                    users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
-                    with open('vk_self_info.json', 'w') as f:
-                        json.dump(users_get, f, indent=2, ensure_ascii=False)
-                    features = make_searching_portrait(users_get[0])
-                    if features:
-                        beginning = datetime.now()
-                        found_users = user_api.users.search(sort=0, count=count, **features,
-                                                            fields='photo_id')
-                        filtered_users = filter_closed(found_users)
-                        ids = get_ids(filtered_users)
-                        photo_array = choose_photos(main_user.method, ids)
-                        group_api.messages.send(**typical_message_params(event), message='Поиск окончен, высылаем фото')
-                        time.sleep(0.7)
-                        send_and_insert_db(group_api, event, photo_array, user_id)
-                        finish = datetime.now()
-                        with open('search_time.txt', 'a') as f:
-                            exec_time = finish - beginning
-                            f.write(f"Execution time: {exec_time}, people: {count}\n")
-                elif text == 'пока':
-                    group_api.messages.send(**typical_message_params(event), message='Пока =)')
-                elif text == 'h':
-                    group_api.messages.send(**typical_message_params(event), message=show_help())
-                else:
-                    group_api.messages.send(**typical_message_params(event), message=f"Команда неизвестна")
-                    time.sleep(0.5)
-                    group_api.messages.send(**typical_message_params(event), message=show_help())
-        except BaseException as er:
-            with open('errors_log.txt', 'a') as f:
-                now = datetime.now()
-                f.writelines([str(er), str(now), '\n'])
-                print(er.with_traceback(None))
-                DataBase.clear_db()
-                return
+        if event.type == VkBotEventType.MESSAGE_NEW:
+            text = event.message.get('text').lower()
+            user_id = event.message.get('from_id')
+            print(f"user {user_id} taken")
+            DataBase.ins_into_users(id=user_id, name='Юрий Борисов')
+            if text == 'id':
+                group_api.messages.send(**typical_message_params(event),
+                                        message=f"ID страницы: {user_id}")
+            elif text == 'f':
+                count = 72
+                group_api.messages.send(**typical_message_params(event),
+                    message=f'Идет поиск...\nСреднее время поиска {int(count * 0.5)} секунд\n'
+                            f'Пожалуйста, подождите =)')
+                users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
+                with open('vk_self_info.json', 'w') as f:
+                    json.dump(users_get, f, indent=2, ensure_ascii=False)
+                features = make_searching_portrait(users_get[0])
+                if features:
+                    beginning = datetime.now()
+                    found_users = user_api.users.search(sort=0, count=count, **features,
+                                                        fields='photo_id')
+                    filtered_users = filter_closed(found_users)
+                    ids = get_ids(filtered_users)
+                    photo_array = choose_photos(main_user.method, ids)
+                    group_api.messages.send(**typical_message_params(event), message='Поиск окончен, высылаем фото')
+                    time.sleep(0.7)
+                    send_and_insert_db(group_api, event, photo_array, user_id)
+                    finish = datetime.now()
+                    with open('search_time.txt', 'a') as f:
+                        exec_time = finish - beginning
+                        f.write(f"Execution time: {exec_time}, people: {count}\n")
+            elif text == 'пока':
+                group_api.messages.send(**typical_message_params(event), message='Пока =)')
+            elif text == 'h':
+                group_api.messages.send(**typical_message_params(event), message=show_help())
+            else:
+                group_api.messages.send(**typical_message_params(event), message=f"Команда неизвестна")
+                time.sleep(0.5)
+                group_api.messages.send(**typical_message_params(event), message=show_help())
 
 
 if __name__ == '__main__':
     main()
+    DataBase.clear_db()
+
+
