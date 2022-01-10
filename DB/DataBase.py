@@ -23,16 +23,6 @@ def create_tables():
     metadata_obj.create_all(engine)
 
 
-    # inst_stmt = insert_psql(Users).values(id=1232412, name='Борисов Юра')
-    # do_nothing_on = inst_stmt.on_conflict_do_nothing(
-    #     index_elements=['id']
-    # )
-    #
-    # print(inst_stmt.compile)
-    # with engine.connect() as conn:
-    #     result = conn.execute(do_nothing_on)
-
-
 def ins_into_users(**kwargs):
     """@kwargs -  id, name"""
     connection.execute(f"""INSERT INTO users
@@ -49,7 +39,7 @@ def ins_into_people(**kwargs):
                        """)
 
 
-def clear_db():
+def clear_tables():
     connection.execute(f"""DELETE FROM people;
                         DELETE FROM users;""")
 

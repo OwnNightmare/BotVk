@@ -3,7 +3,7 @@ import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import time
 from datetime import datetime
-from VK_funcs import make_searching_portrait, my_token, flat_sql_row
+from VK_funcs import make_searching_portrait, my_token, flat_nested
 import json
 from random import shuffle
 # from vk_api.longpoll import VkLongPoll, VkEventType
@@ -44,11 +44,13 @@ def get_ids(pairs_list: list):
     Возвращает список id-страниц, которых нет в базе """
 
     records = DataBase.connection.execute(f"""SELECT candidate_id 
-                                FROM people
+                                FROM people p
+                                JOIN users u
+                                ON p.user_id = u.id
                                 """).fetchall()
     found_ids = [u['id'] for u in pairs_list]
     if len(records) > 0:
-        seen_ids = [i for i in flat_sql_row(records)]
+        seen_ids = [i for i in flat_nested(records)]
         new_ids = list(set(found_ids).difference(seen_ids))
         return new_ids
     else:
@@ -106,7 +108,7 @@ def send_and_insert_db(query_maker, event, array, user_id):
 
 
 def main():
-    DataBase.clear_db()
+    DataBase.clear_tables()
     main_user = vk_api.VkApi(token=my_token)
     main_bot = vk_api.VkApi(token=bot_token)
     bot_long_pool = VkBotLongPoll(main_bot, group_id=group_id)
@@ -126,7 +128,7 @@ def main():
             elif text == 'f':
                 count = 72
                 group_api.messages.send(**typical_message_params(event),
-                    message=f'Идет поиск...\nСреднее время поиска {int(count * 0.5)} секунд\n'
+                    message=f'Идет поиск...\nСреднее время поиска {int(count * 0.43)} секунд\n'
                             f'Пожалуйста, подождите =)')
                 users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
                 with open('vk_self_info.json', 'w') as f:

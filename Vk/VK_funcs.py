@@ -26,10 +26,10 @@ my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b
 #         self.portrait = {}
 
 
-def flat_sql_row(array):
+def flat_nested(array):
     for item in array:
         if isinstance(item, (sqlalchemy.engine.row.LegacyRow, list, tuple)):
-            for sub_item in flat_sql_row(item):
+            for sub_item in flat_nested(item):
                 yield sub_item
         else:
             yield item
