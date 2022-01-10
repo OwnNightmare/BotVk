@@ -6,7 +6,7 @@ from VK_funcs import make_searching_portrait, get_ids, my_token
 import json
 from random import shuffle
 # from vk_api.longpoll import VkLongPoll, VkEventType
-
+from DB import DataBase
 bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'
 group_id = 209978754
 
@@ -77,7 +77,7 @@ def choose_photos(query_maker: vk_api.VkApi.method, ids):
                     json.dump(owner_and_photos, f, indent=2)
 
 
-def send_photos(query_maker, event, array):
+def send_and_insert_db(query_maker, event, array, user_id):
     """query_maker: объект класса VkApiMethod,  для обращения к API методам, как к обычным,
     event: событие VkBotLongPoll.listen(),
     array: список формата [[owner_id, [photo_id1, photo_id2..], ...]] """
@@ -85,6 +85,7 @@ def send_photos(query_maker, event, array):
         query_maker.messages.send(**typical_message_params(event),
                                   attachment=[i for i in user_collage[1]],
                                   message=f"https://vk.com/id{user_collage[0]}")
+        DataBase.ins_into_people(user_id=user_id, candidate_id=user_collage[0])
 
 
 def main():
@@ -93,13 +94,15 @@ def main():
     bot_long_pool = VkBotLongPoll(main_bot, group_id=group_id)
     group_api = main_bot.get_api()
     user_api = main_user.get_api()
+    DataBase.create_tables()
 
     for event in bot_long_pool.listen():
         try:
             if event.type == VkBotEventType.MESSAGE_NEW:
                 text = event.message.get('text').lower()
                 user_id = event.message.get('from_id')
-                print(f"{user_id} started chat")
+                print(f"user {user_id} taken")
+                DataBase.ins_into_users(id=user_id, name='Юрий Борисов')
                 if text == 'id':
                     group_api.messages.send(**typical_message_params(event),
                                             message=f"ID страницы: {user_id}")
@@ -121,7 +124,7 @@ def main():
                         photo_array = choose_photos(main_user.method, ids)
                         group_api.messages.send(**typical_message_params(event), message='Поиск окончен, высылаем фото')
                         time.sleep(0.7)
-                        send_photos(group_api, event, photo_array)
+                        send_and_insert_db(group_api, event, photo_array, user_id)
                         finish = datetime.now()
                         with open('search_time.txt', 'a') as f:
                             exec_time = finish - beginning
@@ -139,6 +142,7 @@ def main():
                 now = datetime.now()
                 f.writelines([str(er), str(now), '\n'])
                 print(er.with_traceback(None))
+                DataBase.clear_db()
                 return
 
 
