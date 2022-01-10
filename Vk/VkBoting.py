@@ -119,7 +119,7 @@ def main():
             text = event.message.get('text').lower()
             user_id = event.message.get('from_id')
             print(f"user {user_id} taken")
-            DataBase.ins_into_users(id=user_id, name='Юрий Борисов')
+            DataBase.ins_into_users(id=user_id, name='')
             if text == 'id':
                 group_api.messages.send(**typical_message_params(event),
                                         message=f"ID страницы: {user_id}")
@@ -158,6 +158,5 @@ def main():
 
 if __name__ == '__main__':
     main()
-    DataBase.clear_db()
 
 
