@@ -23,7 +23,7 @@ def show_help():
     return text
 
 
-def typical_message_params(event):
+def usual_msg_prms(event):
     params = {'user_id': event.message['from_id'],
               'random_id': get_message_id(),
               'peer_id': group_id * -1}
@@ -60,7 +60,8 @@ def get_ids(pairs_list: list):
 def choose_photos(query_maker: vk_api.VkApi.method, ids):
     """
     query_maker - bound method VkApi.method, должен иметь ключ пользователя
-    ids - список ID страниц, у которых нужно запросить фото через photos.get"""
+    ids - список ID страниц, у которых нужно запросить фото через photos.get
+    """
     resp_obj_store = []  # Список для объектов успешного ответа photos.get, все фото 1 пользователя и метаданные к ним
     sorted_photos = []
     owner_and_photos = []
@@ -101,7 +102,7 @@ def send_and_insert_db(query_maker, event, array, user_id):
     event: событие VkBotLongPoll.listen(),
     array: список формата [[owner_id, [photo_id1, photo_id2..], ...]] """
     for user_collage in array:
-        query_maker.messages.send(**typical_message_params(event),
+        query_maker.messages.send(**usual_msg_prms(event),
                                   attachment=[i for i in user_collage[1]],
                                   message=f"https://vk.com/id{user_collage[0]}")
         DataBase.ins_into_people(user_id=user_id, candidate_id=user_collage[0])
@@ -117,31 +118,63 @@ def main():
     DataBase.create_tables()
 
     for event in bot_long_pool.listen():
+        wrong_msg = 0
         if event.type == VkBotEventType.MESSAGE_NEW:
             text = event.message.get('text').lower()
             user_id = event.message.get('from_id')
             print(f"user {user_id} taken")
             DataBase.ins_into_users(id=user_id, name='')
             if text == 'id':
-                group_api.messages.send(**typical_message_params(event),
+                group_api.messages.send(**usual_msg_prms(event),
                                         message=f"ID страницы: {user_id}")
             elif text == 'f':
                 count = 72
-                group_api.messages.send(**typical_message_params(event),
-                    message=f'Идет поиск...\nСреднее время поиска {int(count * 0.43)} секунд\n'
-                            f'Пожалуйста, подождите =)')
                 users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
-                with open('vk_self_info.json', 'w') as f:
+                print(users_get)
+                group_api.messages.send(**usual_msg_prms(event),
+                                        message=f'Идет поиск...\nСреднее время поиска {int(count * 0.43)} секунд\n'
+                            f'Пожалуйста, подождите =)')
+                with open('vk_self_info.json', 'a') as f:
                     json.dump(users_get, f, indent=2, ensure_ascii=False)
                 features = make_searching_portrait(users_get[0])
-                if features:
+                while isinstance(features, str):
+                    if wrong_msg == 0:
+                        group_api.messages.send(**usual_msg_prms(event),
+                                                message='Укажите возраст для более поиска')
+                    elif wrong_msg == 1:
+                        group_api.messages.send(
+                            **usual_msg_prms(event),
+                                                message='Кажется, возраст введен некорректно'
+                                                        '(нужны только цифры)')
+                    elif wrong_msg == 2:
+                        group_api.messages.send(**usual_msg_prms(event),
+                                                message=' Извините, не могу выполнить поиск')
+                        break
+                    for thing in bot_long_pool.listen():
+                        print('listen second loop')
+                        if thing.type == VkBotEventType.MESSAGE_NEW:
+                            given_text = thing.message.get('text').strip()
+                            if given_text.lower() not in ['пока', "назад", "выход", 'quit']:
+                                group_api.messages.send(**usual_msg_prms(event), message='Секундочку ;)')
+                                if given_text.isdigit():
+                                    group_api.messages.send(**usual_msg_prms(event), message='Ok, возобновляю поиск...')
+                                    given_text = int(given_text)
+                                    features = make_searching_portrait(users_get[0], age=given_text)
+                                wrong_msg += 1
+                                break
+                            else:
+                                group_api.messages.send(**usual_msg_prms(event), message='Ok, идем в главное меню')
+                                features = {}
+                    print('Get out alive')
+                    print(features)
+                if isinstance(features, dict) and len(features) > 0:
                     beginning = datetime.now()
                     found_users = user_api.users.search(sort=0, count=count, **features,
                                                         fields='photo_id')
                     filtered_users = filter_closed(found_users)
                     ids = get_ids(filtered_users)
                     photo_array = choose_photos(main_user.method, ids)
-                    group_api.messages.send(**typical_message_params(event), message='Поиск окончен, высылаем фото')
+                    group_api.messages.send(**usual_msg_prms(event), message='Поиск окончен, высылаю фото')
                     time.sleep(0.7)
                     send_and_insert_db(group_api, event, photo_array, user_id)
                     finish = datetime.now()
@@ -149,13 +182,13 @@ def main():
                         exec_time = finish - beginning
                         f.write(f"Execution time: {exec_time}, people: {count}\n")
             elif text == 'пока':
-                group_api.messages.send(**typical_message_params(event), message='Пока =)')
+                group_api.messages.send(**usual_msg_prms(event), message='Пока =)')
             elif text == 'h':
-                group_api.messages.send(**typical_message_params(event), message=show_help())
+                group_api.messages.send(**usual_msg_prms(event), message=show_help())
             else:
-                group_api.messages.send(**typical_message_params(event), message=f"Команда неизвестна")
+                group_api.messages.send(**usual_msg_prms(event), message=f"Команда неизвестна")
                 time.sleep(0.5)
-                group_api.messages.send(**typical_message_params(event), message=show_help())
+                group_api.messages.send(**usual_msg_prms(event), message=show_help())
 
 
 if __name__ == '__main__':
