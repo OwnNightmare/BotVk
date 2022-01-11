@@ -43,7 +43,9 @@ def clear_tables():
     connection.execute(f"""DELETE FROM people;
                         DELETE FROM users;""")
 
-
+if __name__ == '__main__':
+    k = '32    7'
+    print(k.strip().isdigit())
 
 
 

@@ -1,5 +1,6 @@
 import datetime
 import sqlalchemy.engine.row
+import json
 
 my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
 
@@ -34,51 +35,49 @@ def flat_nested(array):
         else:
             yield item
 
+
 def calc_age(acc_info: dict):
     """acc_info - значение ключа 'response' json ответа Vk API метода account.getProfileInfo"""
     birth_info = acc_info.get('bdate')
     if not birth_info:
-        print('Нет ключа bdate')
         return
     birth_info = birth_info.split('.')
-    if len(birth_info) < 3:
-        print('Формат даты получен неверно')
-        return
-    birth_info = [int(i) for i in birth_info[::-1]]
-    birthday = datetime.date(birth_info[0], birth_info[1], birth_info[2])
-    curr_date = datetime.date.today()
-    age = curr_date - birthday
-    age = age.days // 364
-    return age
+    birth_info = [int(i) for i in birth_info[::-1] if i.isdigit()]
+    if len(birth_info) == 3:
+        birthday = datetime.date(birth_info[0], birth_info[1], birth_info[2])
+        curr_date = datetime.date.today()
+        age = curr_date - birthday
+        age = age.days // 364
+        return age
+    return
 
 
-def make_searching_portrait(acc_info: dict):
+def make_searching_portrait(acc_info: dict, age=None):
     """ Возвращает "портрет" искомого человека, составленный на основании acc_info.
     acc_info - значение ключа 'response'  успешного json ответа Vk API метода account.getProfileInfo"""
-    _portrait = {}
-    response = acc_info
-    _portrait['city'] = response.get('city').get('id')
-    _portrait['status'] = response.get('relation')
-    own_age = calc_age(response)
-    if own_age:
-        sex = response.get('sex')
-        if str(sex).isdigit():
-            if int(sex) == 2:
-                _portrait['sex'] = 1
-                _portrait['age_from'] = own_age - 2
-                _portrait['age_to'] = own_age
-            elif sex == 1:
-                _portrait['sex'] = 2
-                _portrait['age_from'] = own_age - 1
-                _portrait['age_to'] = own_age + 2
-            else:
-                _portrait['sex'] = ''
-                _portrait['age_from'] = own_age - 1
-                _portrait['age_to'] = own_age + 1
-            return _portrait
+    _portrait = {'city': acc_info.get('city').get('id'), 'status': acc_info.get('relation')}
+    if not age:
+        age = calc_age(acc_info)
+    if isinstance(age, int) and age in range(12, 120):
+        sex = acc_info.get('sex')
+        if int(sex) == 2:
+            _portrait['sex'] = 1
+            _portrait['age_from'] = age - 2
+            _portrait['age_to'] = age
+        elif sex == 1:
+            _portrait['sex'] = 2
+            _portrait['age_from'] = age - 1
+            _portrait['age_to'] = age + 2
         else:
-            print('Пол не получен')
-            return
+            _portrait['sex'] = 0
+            _portrait['age_from'] = age - 1
+            _portrait['age_to'] = age + 1
+            with open('portrait.json', 'a') as f:
+                json.dump(_portrait, f, indent=2, ensure_ascii=False)
+        return _portrait
+    else:
+        return 'age er'
+
 
 
 if __name__ == '__main__':
