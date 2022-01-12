@@ -72,28 +72,8 @@ def make_searching_portrait(acc_info: dict, age=None):
             _portrait['sex'] = 0
             _portrait['age_from'] = age - 1
             _portrait['age_to'] = age + 1
-            with open('portrait.json', 'a') as f:
-                json.dump(_portrait, f, indent=2, ensure_ascii=False)
+        with open('portrait.json', 'a') as f:
+            json.dump(_portrait, f, indent=2, ensure_ascii=False)
         return _portrait
-    else:
-        return 'age er'
-
-
-
-if __name__ == '__main__':
-    a = {1, 2, 4}
-    c = [2, 4, 4, 4]
-    print(list(a.difference(c)))
-    # i = '1243432/4545'
-    # print(i.strip('/'))
-    # VkClient.open_page()
-    # user_token = input('Ваш Vk токен: ')
-    # me = MyVkClass(MyVkClass.my_token)
-
-    # @classmethod
-    # def open_page(cls):
-    #     oauth_url = 'https://oauth.vk.com/authorize'
-    #     params_open = "client_id=8044074&redirect_uri=https://oauth.vk.com/blank.html&scope=65538&display=page&response_type=token"
-    #     webbrowser.open_new(f"{oauth_url}?{params_open}")
 
 

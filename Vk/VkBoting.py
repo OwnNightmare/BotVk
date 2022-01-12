@@ -1,13 +1,16 @@
+from typing import Callable
+
 import sqlalchemy.engine.row
 import vk_api
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import time
 from datetime import datetime
-from VK_funcs import make_searching_portrait, my_token, flat_nested
+from VK_funcs import make_searching_portrait, my_token, flat_nested, key
 import json
 from random import shuffle
 # from vk_api.longpoll import VkLongPoll, VkEventType
 from DB import DataBase
+
 bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'
 group_id = 209978754
 
@@ -19,17 +22,47 @@ def usual_msg_prms(user_id):
     return params
 
 
-def sender(api, user_id, text=None, attachments=None):
+def sender(api, user_id, text=None, attachments=None, keyboard=None):
+    params = {'user_id': user_id,
+              'random_id': int(time.time() * 1000),
+              'peer_id': group_id * -1}
 
-    def usual_msg_prms():
-        params = {'user_id': user_id,
-                  'random_id': int(time.time() * 1000),
-                  'peer_id': group_id * -1}
-        return params
-
-    api.messages.send(**usual_msg_prms(), message=text, attachments=attachments)
+    api.messages.send(**params, message=text, attachments=attachments, keyboard=keyboard)
 
 
+def say_welcome():
+    hello = """ Добро пожаловать в бота VKindere!\n
+Я могу найти вам пару:
+выберу 4-х человек, основываясь на ваших данных, 
+и пришлю фото каждого кандидата, с ссылкой на профиль\n
+Чтобы начать поиск, напишите: 
+поиск
+"""
+    return hello
+
+
+def main_keyboard():
+
+    keyboard = """
+                 {"one_time": false, "buttons":
+                 [[{"action": {"type": "text", "label": "Поиск"}, "color": "positive"}]]}
+               """
+    return keyboard
+
+
+def empty_keyboard():
+    keyboard = """
+                     {"one_time": true, "buttons": []}
+                   """
+    return keyboard
+
+
+def cancel_keyboard():
+    cancel_but = """
+                   {"one_time": false, "buttons":
+                   [[{"action": {"type": "text", "label": "Отмена"}, "color": "negative"}]]}
+                 """
+    return cancel_but
 
 
 def show_help():
@@ -61,8 +94,7 @@ def get_ids(pairs_list: list):
         seen_ids = [i for i in flat_nested(records)]
         new_ids = list(set(found_ids).difference(seen_ids))
         return new_ids
-    else:
-        return found_ids
+    return found_ids
 
 
 def choose_photos(query_maker: vk_api.VkApi.method, ids):
@@ -90,7 +122,7 @@ def choose_photos(query_maker: vk_api.VkApi.method, ids):
     for user in sorted_photos:
         users_photos = []
         foto_count = 0
-        if user_count > 3:
+        if user_count > 2:
             break
         for photo in user:
             if foto_count > 2:
@@ -105,14 +137,15 @@ def choose_photos(query_maker: vk_api.VkApi.method, ids):
     return owner_and_photos
 
 
-def send_and_insert_db(api, array, user_id):
+def send_photos(api, array, user_id, keyboard: Callable = None):
     """query_maker: объект класса VkApiMethod,  для обращения к API методам, как к обычным,
     event: событие VkBotLongPoll.listen(),
     array: список формата [[owner_id, [photo_id1, photo_id2..], ...]] """
     for user_collage in array:
         api.messages.send(**usual_msg_prms(user_id),
                           attachment=[i for i in user_collage[1]],
-                          message=f"https://vk.com/id{user_collage[0]}")
+                          message=f"https://vk.com/id{user_collage[0]}",
+                          keyboard=keyboard())
         DataBase.ins_into_people(user_id=user_id, candidate_id=user_collage[0])
 
 
@@ -126,67 +159,65 @@ def main():
     # DataBase.create_tables()
 
     for event in bot_long_pool.listen():
-        wrong_msg = 0
         if event.type == VkBotEventType.MESSAGE_NEW:
-            request = event.message.get('text').lower().strip()
+            request = event.message.get('text').casefold().strip()
             user_id = event.message.get('from_id')
             print(f"user {user_id} taken")
             DataBase.ins_into_users(id=user_id, name='')
-            if request == 'id':
-                sender(group_api, user_id, f'ID вашей страницы: {user_id}')
-            elif request == 'f':
-                count = 72
+            if request != 'поиск':
+                sender(group_api, user_id, text=say_welcome(),
+                       keyboard=main_keyboard())
+            elif request == "поиск":
+                count = 70
                 users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
-                sender(group_api, user_id, f'Собираю информацию')
                 with open('vk_self_info.json', 'a') as f:
                     json.dump(users_get, f, indent=2, ensure_ascii=False)
                 features = make_searching_portrait(users_get[0])
-                while isinstance(features, str):
-                    if wrong_msg == 0:
-                        time.sleep(0.7)
-                        sender(group_api, user_id, 'Уточните, пожалуйста, возраст')
-                    elif wrong_msg == 1:
-                        sender(group_api, user_id, 'Кажется, возраст введен неверное, используйте только цифры')
-                    elif wrong_msg == 2:
-                        sender(group_api, user_id, 'Не могу выполнить поиск по вашим данным, извините')
-                        break
-                    for thing in bot_long_pool.listen():
-                        if thing.type == VkBotEventType.MESSAGE_NEW:
-                            given_text = thing.message.get('text').strip()
-                            if given_text.lower() not in ['back', "назад"]:
-                                if given_text.isdigit():
-                                    sender(group_api, user_id, 'Принято')
-                                    given_text = int(given_text)
-                                    features = make_searching_portrait(users_get[0], age=given_text)
-                                wrong_msg += 1
-                                break
-                            else:
-                                sender(group_api, user_id, 'Ok, возвращаемся в главное меню')
-                                features = {}
-                                break
-                if isinstance(features, dict) and len(features) > 0:
-                    sender(group_api, user_id, 'Начинаю поиск, пожалуйста, подождите')
+                if features is None:
+                    wrong_input = 0
+                    while features is None:
+                        if wrong_input == 0:
+                            sender(group_api, user_id, 'Уточните ваш возраст', keyboard=cancel_keyboard())
+                        elif wrong_input == 1:
+                            sender(group_api, user_id, 'Кажется, возраст введен неверное, используйте только цифры'
+                                                       ' в диапазоне от 14 до 115')
+                        elif wrong_input == 2:
+                            sender(group_api, user_id, 'Не могу выполнить поиск, попробуйте начать новый',
+                                   keyboard=main_keyboard())
+                            break
+                        for thing in bot_long_pool.listen():
+                            if thing.type == VkBotEventType.MESSAGE_NEW:
+                                answer = thing.message.get('text').casefold().strip()
+                                if answer != 'отмена':
+                                    if answer.isdigit() and int(answer) in range(14, 116):
+                                        # if int(answer) in range(14, 116):
+                                        answer = int(answer)
+                                        features = make_searching_portrait(users_get[0], age=answer)
+                                    wrong_input += 1
+                                    break
+                                else:
+                                    sender(group_api, user_id, 'Поиск отменен', keyboard=main_keyboard())
+                                    features = 'break while loop'
+                                    break
+                if isinstance(features, dict) and len(features) == 5:
+                    sender(group_api, user_id, 'Идет поиск...', keyboard=empty_keyboard())
                     beginning = datetime.now()
                     found_users = user_api.users.search(sort=0, count=count, **features,
                                                         fields='photo_id')
                     filtered_users = filter_closed(found_users)
                     ids = get_ids(filtered_users)
                     photo_array = choose_photos(main_user.method, ids)
-                    sender(group_api, user_id, 'Готово, высылаю фото')
-                    time.sleep(0.7)
-                    send_and_insert_db(group_api, photo_array, user_id)
+                    send_photos(group_api, photo_array, user_id, main_keyboard)
                     finish = datetime.now()
                     with open('search_time.txt', 'a') as f:
                         exec_time = finish - beginning
                         f.write(f"Execution time: {exec_time}, people: {count}\n")
-            elif request == 'пока':
-                sender(group_api, user_id, 'До свидания, был рад помочь')
-            elif request == 'h':
-                group_api.messages.send(**usual_msg_prms(user_id), message=show_help())
-            else:
-                sender(group_api, user_id, 'Увы, пока что  я в этом не разбираюсь')
-                time.sleep(0.9)
-                sender(group_api, user_id, 'Для справки отправьте "h"')
+
+
+            # else:
+            #     sender(group_api, user_id, 'Увы, пока что  я в этом не разбираюсь')
+            #     time.sleep(0.9)
+            #     sender(group_api, user_id, 'Для справки отправьте "h"')
 
 
 if __name__ == '__main__':
