@@ -1,12 +1,12 @@
-from typing import Callable
 import vk_api
-from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 import time
 import datetime
-import sqlalchemy.engine.row
-from datetime import datetime
-import json
+from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from random import shuffle
+from typing import Callable
+from datetime import datetime
+import sqlalchemy.engine.row
+import json
 from DB import DataBase
 
 my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
