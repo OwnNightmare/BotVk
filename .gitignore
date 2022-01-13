@@ -12,4 +12,4 @@ Vk/vk_self_info.json
 DB/__pycache__/
 Vk/portrait.json
 Vk/draft.py
-
+Vk/VK_funcs.py
