@@ -90,6 +90,13 @@ def calc_age(acc_info: dict):
     return
 
 
+def get_name(user_get_response):
+    """Возвращает Имя и Фамилию пользователя"""
+    user = user_get_response[0]
+    name = f"{user.get('first_name')} {user.get('last_name')}"
+    return name
+
+
 def make_searching_portrait(acc_info: dict, age=None):
     """ Возвращает "портрет" искомого человека, составленный на основании acc_info.
     acc_info - значение ключа 'response'  успешного json ответа Vk API метода account.getProfileInfo"""
@@ -173,13 +180,12 @@ def choose_photos(query_maker: vk_api.VkApi.method, ids):
     shuffle(ids)
     for user_id in ids:
         resp_obj_store.append(query_maker('photos.get', values={'owner_id': user_id, 'album_id': 'profile',
-                                                        'extended': 1, 'photo_sizes': 0}))
+                                                                'extended': 1, 'photo_sizes': 0}))
     for user in resp_obj_store:
         user_photo_list = user['items']
         user_photo_list: list
         user_photo_list.sort(key=lambda d: d['likes']['count'] + d['comments']['count'], reverse=True)
         sorted_photos.append(user_photo_list)
-    photo = {}
     user_count = 0
     for user in sorted_photos:
         users_photos = []
@@ -220,76 +226,60 @@ def main():
     bot_long_pool = VkBotLongPoll(main_bot, group_id=group_id)
     group_api = main_bot.get_api()
     user_api = main_user.get_api()
-    # DataBase.create_tables()
 
     for event in bot_long_pool.listen():
-        try:
-            if event.type == VkBotEventType.MESSAGE_NEW:
-                request = event.message.get('text').casefold().strip()
-                user_id = event.message.get('from_id')
-                print(f"user {user_id} taken")
-                DataBase.ins_into_users(id=user_id, name='')
-                if request != 'поиск':
-                    sender(group_api, user_id, text=say_welcome(),
-                           keyboard=bot_buttons()['search'])
-                elif request == "поиск":
-                    count = 70
-                    users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
-                    with open('vk_self_info.json', 'a') as f:
-                        json.dump(users_get, f, indent=2, ensure_ascii=False)
-                    features = make_searching_portrait(users_get[0])
-                    if features is None:
-                        wrong_input = 0
-                        while not features:
-                            if wrong_input == 0:
-                                sender(group_api, user_id, 'Уточните ваш возраст', keyboard=bot_buttons()['cancel'])
-                            elif wrong_input == 1:
-                                sender(group_api, user_id, 'Кажется, возраст введен неверное, используйте только цифры'
-                                                           ' в диапазоне от 14 до 115')
-                            elif wrong_input == 2:
-                                sender(group_api, user_id, 'Не могу выполнить поиск, попробуйте начать новый',
-                                       keyboard=bot_buttons()['search'])
-                                break
-                            for thing in bot_long_pool.listen():
-                                if thing.type == VkBotEventType.MESSAGE_NEW:
-                                    answer = thing.message.get('text').casefold().strip()
-                                    if answer != 'отмена':
-                                        if answer.isdigit() and int(answer) in range(14, 116):
-                                            # if int(answer) in range(14, 116):
-                                            answer = int(answer)
-                                            features = make_searching_portrait(users_get[0], age=answer)
-                                        wrong_input += 1
-                                        break
-                                    else:
-                                        sender(group_api, user_id, 'Поиск отменен', keyboard=bot_buttons()['search'])
-                                        features = 'break while loop'
-                                        break
-                    if isinstance(features, dict) and len(features) == 5:
-                        sender(group_api, user_id, 'Идет поиск...', keyboard=bot_buttons()['empty'])
-                        beginning = datetime.now()
-                        found_users = user_api.users.search(sort=0, count=count, **features,
-                                                            fields='photo_id')
-                        filtered_users = filter_closed(found_users)
-                        ids = get_ids(filtered_users)
-                        photo_array = choose_photos(main_user.method, ids)
-                        send_photos(group_api, photo_array, user_id, bot_buttons)
-                        finish = datetime.now()
-                        with open('search_time.txt', 'a') as f:
-                            exec_time = finish - beginning
-                            f.write(f"Execution time: {exec_time}, people: {count}\n")
-        except:
-            pass
-        finally:
-            sender(group_api, user_id, 'Извините, что-то пошло не так')
-
-
-            # else:
-            #     sender(group_api, user_id, 'Увы, пока что  я в этом не разбираюсь')
-            #     time.sleep(0.9)
-            #     sender(group_api, user_id, 'Для справки отправьте "h"')
+        if event.type == VkBotEventType.MESSAGE_NEW:
+            request = event.message.get('text').casefold().strip()
+            user_id = event.message.get('from_id')
+            print(f"user {user_id} taken")
+            if request != 'поиск':
+                sender(group_api, user_id, text=say_welcome(),
+                       keyboard=bot_buttons()['search'])
+            elif request == "поиск":
+                count = 70
+                users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
+                user_name = get_name(users_get)
+                DataBase.ins_into_users(id=user_id, name=user_name)
+                features = make_searching_portrait(users_get[0])
+                if features is None:
+                    wrong_input = 0
+                    while not features:
+                        if wrong_input == 0:
+                            sender(group_api, user_id, 'Уточните ваш возраст', keyboard=bot_buttons()['cancel'])
+                        elif wrong_input == 1:
+                            sender(group_api, user_id, 'Кажется, возраст введен неверное, используйте только цифры'
+                                                       ' в диапазоне от 14 до 115')
+                        elif wrong_input == 2:
+                            sender(group_api, user_id, 'Не могу выполнить поиск, попробуйте начать новый',
+                                   keyboard=bot_buttons()['search'])
+                            break
+                        for thing in bot_long_pool.listen():
+                            if thing.type == VkBotEventType.MESSAGE_NEW:
+                                answer = thing.message.get('text').casefold().strip()
+                                if answer != 'отмена':
+                                    if answer.isdigit() and int(answer) in range(14, 116):
+                                        answer = int(answer)
+                                        features = make_searching_portrait(users_get[0], age=answer)
+                                    wrong_input += 1
+                                    break
+                                else:
+                                    sender(group_api, user_id, 'Поиск отменен', keyboard=bot_buttons()['search'])
+                                    features = 'break while loop'
+                                    break
+                if isinstance(features, dict) and len(features) == 5:
+                    sender(group_api, user_id, 'Идет поиск...', keyboard=bot_buttons()['empty'])
+                    beginning = datetime.now()
+                    found_users = user_api.users.search(sort=0, count=count, **features,
+                                                        fields='photo_id')
+                    filtered_users = filter_closed(found_users)
+                    ids = get_ids(filtered_users)
+                    photo_array = choose_photos(main_user.method, ids)
+                    send_photos(group_api, photo_array, user_id, bot_buttons)
+                    finish = datetime.now()
+                    with open('search_time.txt', 'a') as f:
+                        exec_time = finish - beginning
+                        f.write(f"Execution time: {exec_time}, people: {count}\n")
 
 
 if __name__ == '__main__':
     main()
-
-

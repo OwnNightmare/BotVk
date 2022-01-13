@@ -44,8 +44,8 @@ def clear_tables():
                         DELETE FROM users;""")
 
 
-
-
+if __name__ == '__main__':
+    create_tables()
 
 
 
