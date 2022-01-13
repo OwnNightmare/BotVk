@@ -4,7 +4,7 @@ import datetime
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from random import shuffle
 from typing import Callable
-from datetime import datetime
+from datetime import datetime as dt
 import sqlalchemy.engine.row
 import json
 from DB import DataBase
@@ -68,24 +68,15 @@ def bot_buttons():
     return my_keyboard
 
 
-def show_help():
-    with open('help.txt') as f:
-        text = f.read()
-    return text
-
-
-def calc_age(acc_info: dict):
-    """acc_info - значение ключа 'response' json ответа Vk API метода account.getProfileInfo"""
-    birth_info = acc_info.get('bdate')
-    if not birth_info:
-        return
-    birth_info = birth_info.split('.')
-    birth_info = [int(i) for i in birth_info[::-1] if i.isdigit()]
-    if len(birth_info) == 3:
-        birthday = datetime.date(birth_info[0], birth_info[1], birth_info[2])
+def calc_age(b_date: str):
+    """"""
+    b_date = b_date.split('.')
+    b_date = [int(i) for i in b_date[::-1] if i.isdigit()]
+    if len(b_date) == 3:
+        birthday = datetime.date(b_date[0], b_date[1], b_date[2])
         curr_date = datetime.date.today()
         age = curr_date - birthday
-        age = age.days // 364
+        age = int(age.days // 364)
         return age
     return
 
@@ -98,11 +89,10 @@ def get_name(user_get_response):
 
 
 def make_searching_portrait(acc_info: dict, age=None):
-    """ Возвращает "портрет" искомого человека, составленный на основании acc_info.
-    acc_info - значение ключа 'response'  успешного json ответа Vk API метода account.getProfileInfo"""
+    """"""
     _portrait = {'city': acc_info.get('city').get('id'), 'status': acc_info.get('relation')}
     if not age:
-        age = calc_age(acc_info)
+        age = calc_age(acc_info.get('bdate'))
     if isinstance(age, int) and age in range(12, 120):
         sex = acc_info.get('sex')
         if int(sex) == 2:
@@ -268,14 +258,14 @@ def main():
                                     break
                 if isinstance(features, dict) and len(features) == 5:
                     sender(group_api, user_id, 'Идет поиск...', keyboard=bot_buttons()['empty'])
-                    beginning = datetime.now()
+                    beginning = dt.now()
                     found_users = user_api.users.search(sort=0, count=count, **features,
                                                         fields='photo_id')
                     filtered_users = filter_closed(found_users)
                     ids = get_ids(filtered_users)
                     photo_array = choose_photos(main_user.method, ids)
                     send_photos(group_api, photo_array, user_id, bot_buttons)
-                    finish = datetime.now()
+                    finish = dt.now()
                     with open('search_time.txt', 'a') as f:
                         exec_time = finish - beginning
                         f.write(f"Execution time: {exec_time}, people: {count}\n")
