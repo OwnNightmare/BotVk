@@ -11,4 +11,5 @@ Vk/search_time.txt
 Vk/vk_self_info.json
 DB/__pycache__/
 Vk/portrait.json
+Vk/draft.py
 
