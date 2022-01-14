@@ -1,7 +1,7 @@
 import pytest
 import unittest
-from Vk.VkBoting import usual_msg_prms, make_searching_portrait, filter_ids
-from DB.DataBase import db, engine, connection, clear_tables
+from Vk.VkBoting import usual_msg_prms, make_searching_portrait, filter_people
+from DB.DataBase import db, engine, connection, clear_tables, create_tables
 
 
 portrait = {
@@ -57,7 +57,7 @@ class TestVkApi(unittest.TestCase):
         assert len(make_searching_portrait(user_with_ok_bdate)) == 5
 
     def test_filter_ids(self):
-        assert len(filter_ids(search_response, 123)) == 1
+        assert len(filter_people(search_response, 123)) == 1
 
     def tearDown(self) -> None:
         clear_tables()

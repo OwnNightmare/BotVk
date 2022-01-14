@@ -36,7 +36,7 @@ def ins_into_people(**kwargs):
     connection.execute(f"""INSERT INTO people
                         ({list(kwargs.keys())[0]}, {list(kwargs.keys())[1]})
                         VALUES({list(kwargs.values())[0]}, '{list(kwargs.values())[1]}')
-                       """)
+                        ON CONFLICT DO NOTHING""")
 
 
 def clear_tables():

@@ -3,10 +3,11 @@ import time
 import datetime
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from random import shuffle
-from typing import Callable
+from typing import Callable, Iterable
 from datetime import datetime as dt
 import sqlalchemy.engine.row
 import json
+from typing import Any
 from DB import DataBase
 
 my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
@@ -14,7 +15,7 @@ bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321
 group_id = 209978754  # ID вашего сообщества
 
 
-def usual_msg_prms(user_id):
+def usual_msg_prms(user_id: int) -> dict:
     """Возвращает обязательные параметры для сообщения в виде словаря:\n
        @user_id - id текущего пользователя ВК.
         """
@@ -25,7 +26,7 @@ def usual_msg_prms(user_id):
     return params
 
 
-def sender(api, user_id, text=None, attachments=None, keyboard=None):
+def sender(api, user_id: int, text: str = None, attachments: Any = None, keyboard=None) -> None:
     """ Отправляет сообщение пользователю в группу, ничего не возвращает\n
     @api - объект класса  VkApiMethod, обязательный параметр\n
     @user_id -  ВК ID  текущего пользователя, обязательный параметр\n
@@ -40,7 +41,7 @@ def sender(api, user_id, text=None, attachments=None, keyboard=None):
     api.messages.send(**params, message=text, attachments=attachments, keyboard=keyboard)
 
 
-def say_welcome():
+def say_welcome() -> str:
     """Возвращает текст приветственного сообщения"""
 
     hello = """ Добро пожаловать в бота VKindere!\n
@@ -53,9 +54,9 @@ def say_welcome():
     return hello
 
 
-def bot_buttons():
-    """ Обязательно указывать ключ словаря!
-    Возвращает словарь со значениями в виде строкового json объекта"""
+def keyboarding() -> dict:
+    """ Возвращает словарь со значениями в виде строкового json объекта\n
+    Обязательно указывать ключ словаря"""
 
     my_keyboard = {'search':
                    """ {"one_time": false, "buttons":
@@ -68,8 +69,10 @@ def bot_buttons():
     return my_keyboard
 
 
-def calc_age(b_date: str):
-    """"""
+def calc_age(b_date: str) -> int or None:
+    """Если день рождения указан полностью:возвращает возраст пользователя\n
+    Если нет: возвращает None\n
+    @b_date - день рождения пользователя в формате str(ДД.ММ.ГГГГ)"""
     b_date = b_date.split('.')
     b_date = [int(i) for i in b_date[::-1] if i.isdigit()]
     if len(b_date) == 3:
@@ -81,15 +84,17 @@ def calc_age(b_date: str):
     return
 
 
-def get_name(user_get_response):
-    """Возвращает Имя и Фамилию пользователя"""
+def get_name(user_get_response: list) -> str:
+    """Возвращает Имя и Фамилию пользователя\n
+    @user_get_response - объект успешного ответа от метода users.get"""
     user = user_get_response[0]
     name = f"{user.get('first_name')} {user.get('last_name')}"
     return name
 
 
-def make_searching_portrait(acc_info: dict, age=None):
-    """"""
+def make_searching_portrait(acc_info: dict, age=None) -> dict or None:
+    """ Возвращает критерии поиска людей для текущего польз-ля\n
+    Если возраст None - вычисляет его из полученных данных\n"""
     _portrait = {'city': acc_info.get('city').get('id'), 'status': acc_info.get('relation')}
     if not age:
         age = calc_age(acc_info.get('bdate'))
@@ -110,13 +115,12 @@ def make_searching_portrait(acc_info: dict, age=None):
         return _portrait
 
 
-def filter_ids(response_obj, user_id):
-    """ Делает запрос в БД, получая id "кандидатов" для пользователя\n
-    исключает их из принятых в аргументе данных\n
-    Возвращает список id, которых еще не видел пользователь\n
-    @pairs_list (закрытые аккаунты отфильтрованы) - список словарей, где каждый - данные о найденном пользователе.
-    Возвращает список данных об аккаунтах, к которым есть доступ
-    @response_obj - успешный ответ users.search метода"""
+def filter_people(response_obj: dict, user_id: None) -> dict or None:
+    """Возвращает список id страниц, которых еще не видел пользователь\n
+    Делает запрос к БД, получая уже записанные id для, \n
+    исключает их из принятых в аргументе response_obj \n
+    @response_obj - успешный ответ users.search метода, dict
+    @user_id - ID текущего пользователя"""
 
     filtered_users = []
     if len(response_obj) > 0:
@@ -139,10 +143,10 @@ def filter_ids(response_obj, user_id):
             return all_ids
 
 
-def flat_nested(array):
-    """ Выпрямляет переданный аргумент, в том числе массив данных из БД,
-    полученный через sqlalchemy\n
-     Возвращает объект итератора"""
+def flat_nested(array: Iterable):
+    """Возвращает объект итератора\n
+    Выпрямляет вложенные структуры, в том числе массив данных из БД,
+    полученный через sqlalchemy\n"""
     for item in array:
         if isinstance(item, (sqlalchemy.engine.row.LegacyRow, list, tuple)):
             for sub_item in flat_nested(item):
@@ -151,12 +155,12 @@ def flat_nested(array):
             yield item
 
 
-def choose_photos(query_maker: vk_api.VkApi.method, ids):
-    """ Выполняет запрос photos.get, для каждого пользователя сортирует фото по популярности,\n
+def choose_photos(query_maker, ids: list) -> list:
+    """ Возвращает список tuple-ов\n
+    Выполняет запрос photos.get, для каждого пользователя сортирует фото по популярности,\n
     формирует tuple('id владельца', [photo<id_владельца>_<id_фото>, ...]),\n
     где список фото - строки в нужном для параметра attachments метода messages.send формате,\n
-    возвращает список tuple-ов\n
-    @query_maker - bound method VkApi.method, должен иметь ключ пользователя
+    @query_maker - bound method VkApi.method, должен иметь ключ пользователя\n
     @ids - список ID страниц, у которых нужно получить фото
     """
     resp_obj_store = []  # Список для объектов успешного ответа photos.get, все фото 1 пользователя и метаданные к ним
@@ -190,11 +194,12 @@ def choose_photos(query_maker: vk_api.VkApi.method, ids):
     return owner_and_photos
 
 
-def send_photos(api, array, user_id, keyboard: Callable = None):
+def send_photos(api: vk_api.vk_api.VkApiMethod, array: Iterable, user_id: int, keyboard: Callable = None) -> None:
     """ Отправляет фото, заносит отправленные id в БД\n
-    @query_maker: объект класса VkApiMethod,  для обращения к API методам, как к обычным\n
-    @event: событие VkBotLongPoll.listen(),\n
-    @array: список формата [[owner_id, [photo_id1, photo_id2..], ...]] """
+    @api: api - объект класса  VkApiMethod\n
+    @array: список формата [[owner_id, [photo_id1, photo_id2..], ...]]\n
+    @user_id: ID текущего пользователя\n
+    @keyboard - ожидается функция keyboarding"""
 
     for user_collage in array:
         api.messages.send(**usual_msg_prms(user_id),
@@ -219,7 +224,7 @@ def main():
             print(f"user {user_id} taken")
             if request != 'поиск':
                 sender(group_api, user_id, text=say_welcome(),
-                       keyboard=bot_buttons()['search'])
+                       keyboard=keyboarding()['search'])
             elif request == "поиск":
                 count = 85
                 users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
@@ -230,13 +235,13 @@ def main():
                     wrong_input = 0
                     while not features:
                         if wrong_input == 0:
-                            sender(group_api, user_id, 'Уточните ваш возраст', keyboard=bot_buttons()['cancel'])
+                            sender(group_api, user_id, 'Уточните ваш возраст', keyboard=keyboarding()['cancel'])
                         elif wrong_input == 1:
                             sender(group_api, user_id, 'Кажется, возраст введен неверное, используйте только цифры'
                                                        ' в диапазоне от 14 до 115')
                         elif wrong_input == 2:
                             sender(group_api, user_id, 'Не могу выполнить поиск, попробуйте начать новый',
-                                   keyboard=bot_buttons()['search'])
+                                   keyboard=keyboarding()['search'])
                             break
                         for thing in bot_long_pool.listen():
                             if thing.type == VkBotEventType.MESSAGE_NEW:
@@ -248,24 +253,26 @@ def main():
                                     wrong_input += 1
                                     break
                                 else:
-                                    sender(group_api, user_id, 'Поиск отменен', keyboard=bot_buttons()['search'])
+                                    sender(group_api, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
                                     features = 'break while loop'
                                     break
                 if isinstance(features, dict) and len(features) == 5:
-                    sender(group_api, user_id, 'Идет поиск...', keyboard=bot_buttons()['empty'])
+                    sender(group_api, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
                     beginning = dt.now()
-                    found_users = user_api.users.search(sort=0, count=count, **features,
-                                                        fields='photo_id')
-                    unique_ids = filter_ids(found_users, user_id)
+                    found_people = user_api.users.search(sort=0, count=count, **features,
+                                                         fields='photo_id')
+                    unique_ids = filter_people(found_people, user_id)
+                    print(found_people)
                     if unique_ids:
                         photos_to_attach = choose_photos(main_user.method, unique_ids)
-                        send_photos(group_api, photos_to_attach, user_id, bot_buttons)
+                        print(type(main_user.method))
+                        send_photos(group_api, photos_to_attach, user_id, keyboarding)
                         finish = dt.now()
                         with open('search_time.txt', 'a') as f:
                             exec_time = finish - beginning
                             f.write(f"Execution time: {exec_time}, people: {count}\n")
                     else:
-                        sender(group_api, user_id, 'Извините, никого не найдено', keyboard=bot_buttons()['search'])
+                        sender(group_api, user_id, 'Извините, никого не найдено', keyboard=keyboarding()['search'])
 
 
 if __name__ == '__main__':
