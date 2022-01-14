@@ -92,9 +92,11 @@ def get_name(user_get_response: list) -> str:
     return name
 
 
-def make_searching_portrait(acc_info: dict, age=None) -> dict or None:
+def make_searching_portrait(acc_info: dict, age: int = None) -> dict or None:
     """ Возвращает критерии поиска людей для текущего польз-ля\n
-    Если возраст None - вычисляет его из полученных данных\n"""
+    Если возраст None - вычисляет его из полученных данных\n
+    @acc_info - словарь с данными о текущем пользователе
+    @age - возраст пользователя"""
     _portrait = {'city': acc_info.get('city').get('id'), 'status': acc_info.get('relation')}
     if not age:
         age = calc_age(acc_info.get('bdate'))
@@ -230,6 +232,7 @@ def main():
                 users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
                 user_name = get_name(users_get)
                 DataBase.ins_into_users(id=user_id, name=user_name)
+                print(users_get)
                 features = make_searching_portrait(users_get[0])
                 if features is None:
                     wrong_input = 0
@@ -262,7 +265,6 @@ def main():
                     found_people = user_api.users.search(sort=0, count=count, **features,
                                                          fields='photo_id')
                     unique_ids = filter_people(found_people, user_id)
-                    print(found_people)
                     if unique_ids:
                         photos_to_attach = choose_photos(main_user.method, unique_ids)
                         print(type(main_user.method))
