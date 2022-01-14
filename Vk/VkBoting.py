@@ -73,6 +73,7 @@ def calc_age(b_date: str) -> int or None:
     """Если день рождения указан полностью:возвращает возраст пользователя\n
     Если нет: возвращает None\n
     @b_date - день рождения пользователя в формате str(ДД.ММ.ГГГГ)"""
+
     b_date = b_date.split('.')
     b_date = [int(i) for i in b_date[::-1] if i.isdigit()]
     if len(b_date) == 3:
@@ -87,6 +88,7 @@ def calc_age(b_date: str) -> int or None:
 def get_name(user_get_response: list) -> str:
     """Возвращает Имя и Фамилию пользователя\n
     @user_get_response - объект успешного ответа от метода users.get"""
+
     user = user_get_response[0]
     name = f"{user.get('first_name')} {user.get('last_name')}"
     return name
@@ -97,6 +99,7 @@ def make_searching_portrait(acc_info: dict, age: int = None) -> dict or None:
     Если возраст None - вычисляет его из полученных данных\n
     @acc_info - словарь с данными о текущем пользователе
     @age - возраст пользователя"""
+
     _portrait = {'city': acc_info.get('city').get('id'), 'status': acc_info.get('relation')}
     if not age:
         age = calc_age(acc_info.get('bdate'))
@@ -117,7 +120,7 @@ def make_searching_portrait(acc_info: dict, age: int = None) -> dict or None:
         return _portrait
 
 
-def filter_people(response_obj: dict, user_id: None) -> dict or None:
+def filter_people(response_obj: dict, user_id: int) -> dict or None:
     """Возвращает список id страниц, которых еще не видел пользователь\n
     Делает запрос к БД, получая уже записанные id для, \n
     исключает их из принятых в аргументе response_obj \n
@@ -212,6 +215,7 @@ def send_photos(api: vk_api.vk_api.VkApiMethod, array: Iterable, user_id: int, k
 
 
 def main():
+    DataBase.create_tables()
     DataBase.clear_tables()
     main_user = vk_api.VkApi(token=my_token)
     main_bot = vk_api.VkApi(token=bot_token)
@@ -223,7 +227,6 @@ def main():
         if event.type == VkBotEventType.MESSAGE_NEW:
             request = event.message.get('text').casefold().strip()
             user_id = event.message.get('from_id')
-            print(f"user {user_id} taken")
             if request != 'поиск':
                 sender(group_api, user_id, text=say_welcome(),
                        keyboard=keyboarding()['search'])
@@ -232,7 +235,6 @@ def main():
                 users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
                 user_name = get_name(users_get)
                 DataBase.ins_into_users(id=user_id, name=user_name)
-                print(users_get)
                 features = make_searching_portrait(users_get[0])
                 if features is None:
                     wrong_input = 0
@@ -267,7 +269,6 @@ def main():
                     unique_ids = filter_people(found_people, user_id)
                     if unique_ids:
                         photos_to_attach = choose_photos(main_user.method, unique_ids)
-                        print(type(main_user.method))
                         send_photos(group_api, photos_to_attach, user_id, keyboarding)
                         finish = dt.now()
                         with open('search_time.txt', 'a') as f:
