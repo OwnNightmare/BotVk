@@ -1,6 +1,8 @@
 import pytest
 import unittest
-from Vk.VkBoting import usual_msg_prms, calc_age, make_searching_portrait
+from Vk.VkBoting import usual_msg_prms, make_searching_portrait, filter_ids
+from DB.DataBase import db, engine, connection, clear_tables
+
 
 portrait = {
     "city": 72,
@@ -22,10 +24,27 @@ user_with_ok_bdate = {
                 'relation': 1
                 }
 
+search_response = {'items': [
+                    {'id': 789456456, 'first_name': 'Анастасия',
+                        'last_name': 'Иванова', 'can_access_closed': False,
+                        'is_closed': True,
+                        'track_code': 'dc355b...'},
+                   {'id': 654321, 'first_name': 'Елизавета', 'last_name': 'Банная',
+                        'can_access_closed': True, 'is_closed': False,
+                        'photo_id': '292_7243202', 'track_code': '0a168ba...'},
+                   {'id': 5555555, 'first_name': 'Антонина', 'last_name': 'Антонова',
+                       'can_access_closed': True, 'is_closed': False,
+                        'photo_id': '555555_111111', 'track_code': '0a168ba...'}]}
 
-class TestVkApi:
-    """При инициализации класса создается объект класса VkClient - тестовый юзер с моим VK-токеном пользователя"""
 
+class TestVkApi(unittest.TestCase):
+    def setUp(self) -> None:
+        connection.execute("""INSERT INTO users
+                            (id, name)
+                            VALUES(123, 'test_user')""")
+        connection.execute("""INSERT INTO people
+                            (user_id, candidate_id)
+                            VALUES(123, 654321)""")
 
     def test_usual_msg_prms(self):
         """Тест получения информации о самом пользователе"""
@@ -36,6 +55,12 @@ class TestVkApi:
         assert make_searching_portrait(user_with_bad_bdate) is None
         assert isinstance(make_searching_portrait(user_with_ok_bdate), dict)
         assert len(make_searching_portrait(user_with_ok_bdate)) == 5
+
+    def test_filter_ids(self):
+        assert len(filter_ids(search_response, 123)) == 1
+
+    def tearDown(self) -> None:
+        clear_tables()
 
 
 
