@@ -107,20 +107,36 @@ def make_searching_portrait(acc_info: dict, age=None):
             _portrait['sex'] = 0
             _portrait['age_from'] = age - 1
             _portrait['age_to'] = age + 1
-        with open('portrait.json', 'a') as f:
-            json.dump(_portrait, f, indent=2, ensure_ascii=False)
         return _portrait
 
 
-def filter_closed(response_obj):
-    """ Возвращает список данных об аккаунтах, к которым есть доступ
+def filter_ids(response_obj, user_id):
+    """ Делает запрос в БД, получая id "кандидатов" для пользователя\n
+    исключает их из принятых в аргументе данных\n
+    Возвращает список id, которых еще не видел пользователь\n
+    @pairs_list (закрытые аккаунты отфильтрованы) - список словарей, где каждый - данные о найденном пользователе.
+    Возвращает список данных об аккаунтах, к которым есть доступ
     @response_obj - успешный ответ users.search метода"""
 
     filtered_users = []
-    for user in response_obj['items']:
-        if user['can_access_closed']:
-            filtered_users.append(user)
-    return filtered_users
+    if len(response_obj) > 0:
+        for user in response_obj['items']:
+            if user['can_access_closed']:
+                filtered_users.append(user)
+        if len(filtered_users) > 0:
+
+            records = DataBase.connection.execute(f"""SELECT candidate_id FROM people p
+                                                    JOIN users u ON p.user_id = u.id 
+                                                    WHERE u.id = {user_id}""").fetchall()
+
+            all_ids = [u['id'] for u in filtered_users]
+            if len(records) > 0:
+                seen_ids = [i for i in flat_nested(records)]
+                new_ids = list(set(all_ids).difference(seen_ids))
+                if len(new_ids) > 0:
+                    return new_ids
+                return
+            return all_ids
 
 
 def flat_nested(array):
@@ -133,27 +149,6 @@ def flat_nested(array):
                 yield sub_item
         else:
             yield item
-
-
-def get_ids(pairs_list: list):
-    """
-    Делает запрос в БД, получая id "кандидатов" для пользователя\n
-    исключает их из принятых в аргументе данных\n
-    Возвращает список id, которых еще не видел пользователь\n
-    @pairs_list (закрытые аккаунты отфильтрованы) - список словарей, где каждый - данные о найденном пользователе.
-     """
-
-    records = DataBase.connection.execute(f"""SELECT candidate_id 
-                                FROM people p
-                                JOIN users u
-                                ON p.user_id = u.id
-                                """).fetchall()
-    found_ids = [u['id'] for u in pairs_list]
-    if len(records) > 0:
-        seen_ids = [i for i in flat_nested(records)]
-        new_ids = list(set(found_ids).difference(seen_ids))
-        return new_ids
-    return found_ids
 
 
 def choose_photos(query_maker: vk_api.VkApi.method, ids):
@@ -226,7 +221,7 @@ def main():
                 sender(group_api, user_id, text=say_welcome(),
                        keyboard=bot_buttons()['search'])
             elif request == "поиск":
-                count = 70
+                count = 85
                 users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
                 user_name = get_name(users_get)
                 DataBase.ins_into_users(id=user_id, name=user_name)
@@ -261,14 +256,16 @@ def main():
                     beginning = dt.now()
                     found_users = user_api.users.search(sort=0, count=count, **features,
                                                         fields='photo_id')
-                    filtered_users = filter_closed(found_users)
-                    ids = get_ids(filtered_users)
-                    photo_array = choose_photos(main_user.method, ids)
-                    send_photos(group_api, photo_array, user_id, bot_buttons)
-                    finish = dt.now()
-                    with open('search_time.txt', 'a') as f:
-                        exec_time = finish - beginning
-                        f.write(f"Execution time: {exec_time}, people: {count}\n")
+                    unique_ids = filter_ids(found_users, user_id)
+                    if unique_ids:
+                        photos_to_attach = choose_photos(main_user.method, unique_ids)
+                        send_photos(group_api, photos_to_attach, user_id, bot_buttons)
+                        finish = dt.now()
+                        with open('search_time.txt', 'a') as f:
+                            exec_time = finish - beginning
+                            f.write(f"Execution time: {exec_time}, people: {count}\n")
+                    else:
+                        sender(group_api, user_id, 'Извините, никого не найдено', keyboard=bot_buttons()['search'])
 
 
 if __name__ == '__main__':
