@@ -126,7 +126,7 @@ def check_city(country_id: int, city_name: str) -> int or None:
                                     WHERE cc.country_id = {country_id} and c.name = '{city}' """).fetchone()
 
     if city_id_array:
-        return city_id_array[0]
+        return int(city_id_array[0])
 
 
 if __name__ == '__main__':

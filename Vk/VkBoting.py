@@ -131,9 +131,9 @@ def make_searching_portrait(user_get_response: list, age: int = None, city_id: i
     acc_info = user_get_response[0]
     portrait = {}
     if not city_id:
-        portrait['city'] = acc_info.get('city').get('id')
+        portrait['city_id'] = acc_info.get('city').get('id')
     else:
-        portrait['city'] = {'city': city_id}
+        portrait['city_id'] = city_id
     if not relation:
         portrait['relation'] = acc_info.get('relation')
     else:
@@ -253,7 +253,6 @@ def send_photos(api: vk_api.vk_api.VkApiMethod, array: Iterable, user_id: int, k
 
 
 def do_main_logic(bot_pool, features: dict, user_get_response, user_id: int, city_id: int = None):
-
     api_user = main_user.get_api()
     api_bot = main_bot.get_api()
     count = 85
@@ -266,6 +265,7 @@ def do_main_logic(bot_pool, features: dict, user_get_response, user_id: int, cit
                     if answer.isdigit() and int(answer) in range(14, 116):
                         answer = int(answer)
                         features = make_searching_portrait(user_get_response, age=answer, city_id=city_id)
+                        print(features)
                         break
                     else:
                         sender(api_bot, user_id, 'Вводите цифры от 14 до 115', keyboard=keyboarding()['cancel'])
