@@ -8,13 +8,15 @@ from datetime import datetime as dt
 import sqlalchemy.engine.row
 import json
 from typing import Any
-from DB import DataBase
-
+from DB.Create_DB import check_country, check_city, \
+    create_tables, clear_users_db, ins_into_people, ins_into_users, connection
 
 
 my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
 bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'  # ключ доступа бота
 group_id = 209978754  # ID вашего сообщества
+main_user = vk_api.VkApi(token=my_token)
+main_bot = vk_api.VkApi(token=bot_token)
 
 
 def usual_msg_prms(user_id: int) -> dict:
@@ -96,24 +98,30 @@ def get_name(user_get_response: list) -> str:
     return name
 
 
-def check(user_get: list) -> bool or str:
+def check(user_get: list) -> str:
     for user in user_get:
-        if not user.get('city') or len(user.get('city')) == 0:
+        if not user.get('country'):
+            return 'country!'
+        if not user.get('city'):
             return 'city!'
-        if not user.get('relation') or len(user.get('relation')) == 0:
+        if not user.get('relation') or len(str(user.get('relation'))) == 0:
             return 'relation!'
-    return True
+    return 'ok'
 
 
-def make_searching_portrait(acc_info: dict, age: int = None) -> dict or None:
+def make_searching_portrait(acc_info: dict, age: int = None, city_id: int = None) -> dict or None:
     """ Возвращает критерии поиска людей для текущего польз-ля\n
     Если возраст None - вычисляет его из полученных данных\n
     @acc_info - словарь с данными о текущем пользователе
     @age - возраст пользователя"""
 
-    _portrait = {'city': acc_info.get('city').get('id'), 'status': acc_info.get('relation')}
+    if not city_id:
+        _portrait = {'city': acc_info.get('city').get('id'), 'status': acc_info.get('relation')}
+    else:
+        _portrait = {'city': city_id, 'status': acc_info.get('relation')}
     if not age:
-        age = calc_age(acc_info.get('bdate'))
+        if acc_info.get('bdate'):
+            age = calc_age(acc_info.get('bdate'))
     if isinstance(age, int) and age in range(12, 120):
         sex = acc_info.get('sex')
         if int(sex) == 2:
@@ -145,7 +153,7 @@ def filter_people(response_obj: dict, user_id: int) -> dict or None:
                 filtered_users.append(user)
         if len(filtered_users) > 0:
 
-            records = DataBase.connection.execute(f"""SELECT candidate_id FROM people p
+            records = connection.execute(f"""SELECT candidate_id FROM people p
                                                     JOIN users u ON p.user_id = u.id 
                                                     WHERE u.id = {user_id}""").fetchall()
 
@@ -222,14 +230,61 @@ def send_photos(api: vk_api.vk_api.VkApiMethod, array: Iterable, user_id: int, k
                           attachment=[i for i in user_collage[1]],
                           message=f"https://vk.com/id{user_collage[0]}",
                           keyboard=keyboard()['search'])
-        DataBase.ins_into_people(user_id=user_id, candidate_id=user_collage[0])
+        ins_into_people(user_id=user_id, candidate_id=user_collage[0])
+
+
+def do_main_logic(bot_pool, features: dict, user_get_response, user_id: int, city_id=None):
+
+    api_user = main_user.get_api()
+    api_bot = main_bot.get_api()
+    count = 85
+    if features is None:
+        wrong_input = 0
+        while not features:
+            if wrong_input == 0:
+                sender(api_bot, user_id, 'Уточните ваш возраст', keyboard=keyboarding()['cancel'])
+            elif wrong_input == 1:
+                sender(api_bot, user_id, 'Кажется, возраст введен неверное, используйте только цифры'
+                                           ' в диапазоне от 14 до 115')
+            elif wrong_input == 2:
+                sender(api_bot, user_id, 'Не могу выполнить поиск, попробуйте начать новый',
+                       keyboard=keyboarding()['search'])
+                break
+            for thing in bot_pool.listen():
+                if thing.type == VkBotEventType.MESSAGE_NEW:
+                    answer = thing.message.get('text').casefold().strip()
+                    if answer != 'отмена':
+                        if answer.isdigit() and int(answer) in range(14, 116):
+                            answer = int(answer)
+                            features = make_searching_portrait(user_get_response[0], age=answer, city_id=city_id)
+                        wrong_input += 1
+                        break
+                    else:
+                        sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
+                        features = 'to break while loop'
+                        break
+                else:
+                    break
+    if isinstance(features, dict) and len(features) == 5:
+        sender(api_bot, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
+        beginning = dt.now()
+        found_people = api_user.users.search(sort=0, count=count, **features,
+                                             fields='photo_id')
+        unique_ids = filter_people(found_people, user_id)
+        if unique_ids:
+            photos_to_attach = choose_photos(main_user.method, unique_ids)
+            send_photos(api_bot, photos_to_attach, user_id, keyboarding)
+            finish = dt.now()
+            with open('search_time.txt', 'a') as f:
+                exec_time = finish - beginning
+                f.write(f"Execution time: {exec_time}, people: {count}\n")
+        else:
+            sender(api_bot, user_id, 'Извините, никого не найдено', keyboard=keyboarding()['search'])
 
 
 def main():
-    DataBase.create_tables()
-    DataBase.clear_tables()
-    main_user = vk_api.VkApi(token=my_token)
-    main_bot = vk_api.VkApi(token=bot_token)
+    create_tables()
+    clear_users_db()
     bot_long_pool = VkBotLongPoll(main_bot, group_id=group_id)
     group_api = main_bot.get_api()
     user_api = main_user.get_api()
@@ -242,53 +297,47 @@ def main():
                 sender(group_api, user_id, text=welcome(),
                        keyboard=keyboarding()['search'])
             elif request == "поиск":
-                count = 85
-                user_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
-                if check(user_get) == 'city!':
+                user_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'country', 'city'])
+                ins_into_users(id=user_id, name=get_name(user_get))
+                completeness = check(user_get)
+                if completeness == 'country!':
+                    sender(group_api, user_id, 'Страна поиска')
+                    for co_event in bot_long_pool.listen():
+                        break_outer = False
+                        if co_event.type == VkBotEventType.MESSAGE_NEW:
+                            country_name = co_event.message.get('text').capitalize()
+                            country_id = check_country(country_name)
+                            if country_id:
+                                sender(group_api, user_id, 'Город')
+                                for city_event in bot_long_pool.listen():
+                                    if city_event.type == VkBotEventType.MESSAGE_NEW:
+                                        city_name = city_event.message['text']
+                                        city_id = check_city(country_id, city_name)
+                                        if city_id:
+                                            features = make_searching_portrait(user_get[0], city_id=city_id)
+                                            do_main_logic(bot_long_pool, features, user_get, user_id, city_id)
+                                            break_outer = True
+                                            break
+                                if break_outer:
+                                    break
+                elif completeness == 'city!':
+                    country_name = user_get[0]['country']['title']
+                    country_id = check_country(country_name)
+                    if country_id:
+                        sender(group_api, user_id, 'Уточните город')
+                        for msg in bot_long_pool.listen():
+                            if msg.type == VkBotEventType.MESSAGE_NEW:
+                                city_name = msg.message.get('text')
+                                city_id = check_city(country_id, city_name)
+                                if city_id:
+                                    features = make_searching_portrait(user_get[0], city_id=city_id)
+                                    do_main_logic(bot_long_pool, features, user_get, user_id, city_id)
+                                    break
+                elif completeness == 'relation':
                     ...
-                    user_name = get_name(user_get)
-                    DataBase.ins_into_users(id=user_id, name=user_name)
-                    features = make_searching_portrait(user_get[0])
-                    if features is None:
-                        wrong_input = 0
-                        while not features:
-                            if wrong_input == 0:
-                                sender(group_api, user_id, 'Уточните ваш возраст', keyboard=keyboarding()['cancel'])
-                            elif wrong_input == 1:
-                                sender(group_api, user_id, 'Кажется, возраст введен неверное, используйте только цифры'
-                                                           ' в диапазоне от 14 до 115')
-                            elif wrong_input == 2:
-                                sender(group_api, user_id, 'Не могу выполнить поиск, попробуйте начать новый',
-                                       keyboard=keyboarding()['search'])
-                                break
-                            for thing in bot_long_pool.listen():
-                                if thing.type == VkBotEventType.MESSAGE_NEW:
-                                    answer = thing.message.get('text').casefold().strip()
-                                    if answer != 'отмена':
-                                        if answer.isdigit() and int(answer) in range(14, 116):
-                                            answer = int(answer)
-                                            features = make_searching_portrait(user_get[0], age=answer)
-                                        wrong_input += 1
-                                        break
-                                    else:
-                                        sender(group_api, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
-                                        features = 'break while loop'
-                                        break
-                    if isinstance(features, dict) and len(features) == 5:
-                        sender(group_api, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
-                        beginning = dt.now()
-                        found_people = user_api.users.search(sort=0, count=count, **features,
-                                                             fields='photo_id')
-                        unique_ids = filter_people(found_people, user_id)
-                        if unique_ids:
-                            photos_to_attach = choose_photos(main_user.method, unique_ids)
-                            send_photos(group_api, photos_to_attach, user_id, keyboarding)
-                            finish = dt.now()
-                            with open('search_time.txt', 'a') as f:
-                                exec_time = finish - beginning
-                                f.write(f"Execution time: {exec_time}, people: {count}\n")
-                        else:
-                            sender(group_api, user_id, 'Извините, никого не найдено', keyboard=keyboarding()['search'])
+                elif completeness == 'ok':
+                    ...
+                # features = make_searching_portrait(user_get[0])
 
 
 if __name__ == '__main__':
