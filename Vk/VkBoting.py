@@ -117,12 +117,10 @@ def check(user_get: list) -> str:
             return 'country!'
         if not user.get('city'):
             return 'city!'
-        if not user.get('relation') or len(str(user.get('relation'))) == 0:
-            return 'relation!'
     return 'ok!'
 
 
-def make_searching_portrait(user_get_response: list, age: int = None, city_id: int = None, relation:int = None) -> dict or None:
+def make_searching_portrait(user_get_response: list, age: int = None, city_id: int = None, relation: int = None) -> dict or None:
     """ Возвращает критерии поиска людей для текущего польз-ля\n
     Если возраст None - вычисляет его из полученных данных\n
     @acc_info - словарь с данными о текущем пользователе
@@ -131,13 +129,13 @@ def make_searching_portrait(user_get_response: list, age: int = None, city_id: i
     acc_info = user_get_response[0]
     portrait = {}
     if not city_id:
-        portrait['city_id'] = acc_info.get('city').get('id')
+        portrait['city'] = acc_info.get('city').get('id')
     else:
-        portrait['city_id'] = city_id
+        portrait['city'] = city_id
     if not relation:
-        portrait['relation'] = acc_info.get('relation')
+        portrait['status'] = acc_info.get('relation')
     else:
-        portrait['relation'] = relation
+        portrait['status'] = relation
     if not age:
         if acc_info.get('bdate'):
             age = calc_age(acc_info.get('bdate'))
@@ -273,6 +271,7 @@ def do_main_logic(bot_pool, features: dict, user_get_response, user_id: int, cit
                     sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
                     break
     if isinstance(features, dict) and len(features) == 5:
+        print(features)
         sender(api_bot, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
         found_people = api_user.users.search(sort=0, count=count, **features,
                                              fields='photo_id')
@@ -335,16 +334,6 @@ def main():
                                     features = make_searching_portrait(user_get, city_id=city_id)
                                     do_main_logic(bot_long_pool, features, user_get, user_id, city_id)
                                     break
-                elif completeness == 'relation!':
-                    sender(group_api, user_id, f'Выберите статус\n{status}')
-                    for ev in bot_long_pool.listen():
-                        if ev.type == VkBotEventType.MESSAGE_NEW:
-                            relation = ev.message['text']
-                            if relation.isdigit() and int(relation) in range(1, 9):
-                                features = make_searching_portrait(user_get, relation=relation)
-                                do_main_logic(bot_long_pool, features, user_get, user_id)
-                                break
-
                 elif completeness == 'ok!':
                     features = make_searching_portrait(user_get)
                     do_main_logic(bot_long_pool, features, user_get, user_id)
