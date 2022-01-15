@@ -10,6 +10,8 @@ import json
 from typing import Any
 from DB import DataBase
 
+
+
 my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
 bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'  # ключ доступа бота
 group_id = 209978754  # ID вашего сообщества
@@ -41,7 +43,7 @@ def sender(api, user_id: int, text: str = None, attachments: Any = None, keyboar
     api.messages.send(**params, message=text, attachments=attachments, keyboard=keyboard)
 
 
-def say_welcome() -> str:
+def welcome() -> str:
     """Возвращает текст приветственного сообщения"""
 
     hello = """ Добро пожаловать в бота VKindere!\n
@@ -92,6 +94,15 @@ def get_name(user_get_response: list) -> str:
     user = user_get_response[0]
     name = f"{user.get('first_name')} {user.get('last_name')}"
     return name
+
+
+def check(user_get: list) -> bool or str:
+    for user in user_get:
+        if not user.get('city') or len(user.get('city')) == 0:
+            return 'city!'
+        if not user.get('relation') or len(user.get('relation')) == 0:
+            return 'relation!'
+    return True
 
 
 def make_searching_portrait(acc_info: dict, age: int = None) -> dict or None:
@@ -228,54 +239,56 @@ def main():
             request = event.message.get('text').casefold().strip()
             user_id = event.message.get('from_id')
             if request != 'поиск':
-                sender(group_api, user_id, text=say_welcome(),
+                sender(group_api, user_id, text=welcome(),
                        keyboard=keyboarding()['search'])
             elif request == "поиск":
                 count = 85
-                users_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
-                user_name = get_name(users_get)
-                DataBase.ins_into_users(id=user_id, name=user_name)
-                features = make_searching_portrait(users_get[0])
-                if features is None:
-                    wrong_input = 0
-                    while not features:
-                        if wrong_input == 0:
-                            sender(group_api, user_id, 'Уточните ваш возраст', keyboard=keyboarding()['cancel'])
-                        elif wrong_input == 1:
-                            sender(group_api, user_id, 'Кажется, возраст введен неверное, используйте только цифры'
-                                                       ' в диапазоне от 14 до 115')
-                        elif wrong_input == 2:
-                            sender(group_api, user_id, 'Не могу выполнить поиск, попробуйте начать новый',
-                                   keyboard=keyboarding()['search'])
-                            break
-                        for thing in bot_long_pool.listen():
-                            if thing.type == VkBotEventType.MESSAGE_NEW:
-                                answer = thing.message.get('text').casefold().strip()
-                                if answer != 'отмена':
-                                    if answer.isdigit() and int(answer) in range(14, 116):
-                                        answer = int(answer)
-                                        features = make_searching_portrait(users_get[0], age=answer)
-                                    wrong_input += 1
-                                    break
-                                else:
-                                    sender(group_api, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
-                                    features = 'break while loop'
-                                    break
-                if isinstance(features, dict) and len(features) == 5:
-                    sender(group_api, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
-                    beginning = dt.now()
-                    found_people = user_api.users.search(sort=0, count=count, **features,
-                                                         fields='photo_id')
-                    unique_ids = filter_people(found_people, user_id)
-                    if unique_ids:
-                        photos_to_attach = choose_photos(main_user.method, unique_ids)
-                        send_photos(group_api, photos_to_attach, user_id, keyboarding)
-                        finish = dt.now()
-                        with open('search_time.txt', 'a') as f:
-                            exec_time = finish - beginning
-                            f.write(f"Execution time: {exec_time}, people: {count}\n")
-                    else:
-                        sender(group_api, user_id, 'Извините, никого не найдено', keyboard=keyboarding()['search'])
+                user_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'city'])
+                if check(user_get) == 'city!':
+                    ...
+                    user_name = get_name(user_get)
+                    DataBase.ins_into_users(id=user_id, name=user_name)
+                    features = make_searching_portrait(user_get[0])
+                    if features is None:
+                        wrong_input = 0
+                        while not features:
+                            if wrong_input == 0:
+                                sender(group_api, user_id, 'Уточните ваш возраст', keyboard=keyboarding()['cancel'])
+                            elif wrong_input == 1:
+                                sender(group_api, user_id, 'Кажется, возраст введен неверное, используйте только цифры'
+                                                           ' в диапазоне от 14 до 115')
+                            elif wrong_input == 2:
+                                sender(group_api, user_id, 'Не могу выполнить поиск, попробуйте начать новый',
+                                       keyboard=keyboarding()['search'])
+                                break
+                            for thing in bot_long_pool.listen():
+                                if thing.type == VkBotEventType.MESSAGE_NEW:
+                                    answer = thing.message.get('text').casefold().strip()
+                                    if answer != 'отмена':
+                                        if answer.isdigit() and int(answer) in range(14, 116):
+                                            answer = int(answer)
+                                            features = make_searching_portrait(user_get[0], age=answer)
+                                        wrong_input += 1
+                                        break
+                                    else:
+                                        sender(group_api, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
+                                        features = 'break while loop'
+                                        break
+                    if isinstance(features, dict) and len(features) == 5:
+                        sender(group_api, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
+                        beginning = dt.now()
+                        found_people = user_api.users.search(sort=0, count=count, **features,
+                                                             fields='photo_id')
+                        unique_ids = filter_people(found_people, user_id)
+                        if unique_ids:
+                            photos_to_attach = choose_photos(main_user.method, unique_ids)
+                            send_photos(group_api, photos_to_attach, user_id, keyboarding)
+                            finish = dt.now()
+                            with open('search_time.txt', 'a') as f:
+                                exec_time = finish - beginning
+                                f.write(f"Execution time: {exec_time}, people: {count}\n")
+                        else:
+                            sender(group_api, user_id, 'Извините, никого не найдено', keyboard=keyboarding()['search'])
 
 
 if __name__ == '__main__':
