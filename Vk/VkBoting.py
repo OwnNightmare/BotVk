@@ -12,6 +12,19 @@ from DB.Create_DB import check_country, check_city, \
     create_tables, clear_users_db, ins_into_people, ins_into_users, connection
 
 
+status = """
+1 — не женат (не замужем),
+2 — встречается,
+3 — помолвлен(-а),
+4 — женат (замужем),
+5 — всё сложно,
+6 — в активном поиске,
+7 — влюблен(-а),
+8 — в гражданском браке."""
+
+
+
+
 my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
 bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'  # ключ доступа бота
 group_id = 209978754  # ID вашего сообщества
@@ -106,37 +119,43 @@ def check(user_get: list) -> str:
             return 'city!'
         if not user.get('relation') or len(str(user.get('relation'))) == 0:
             return 'relation!'
-    return 'ok'
+    return 'ok!'
 
 
-def make_searching_portrait(acc_info: dict, age: int = None, city_id: int = None) -> dict or None:
+def make_searching_portrait(user_get_response: list, age: int = None, city_id: int = None, relation:int = None) -> dict or None:
     """ Возвращает критерии поиска людей для текущего польз-ля\n
     Если возраст None - вычисляет его из полученных данных\n
     @acc_info - словарь с данными о текущем пользователе
     @age - возраст пользователя"""
 
+    acc_info = user_get_response[0]
+    portrait = {}
     if not city_id:
-        _portrait = {'city': acc_info.get('city').get('id'), 'status': acc_info.get('relation')}
+        portrait['city'] = acc_info.get('city').get('id')
     else:
-        _portrait = {'city': city_id, 'status': acc_info.get('relation')}
+        portrait['city'] = {'city': city_id}
+    if not relation:
+        portrait['relation'] = acc_info.get('relation')
+    else:
+        portrait['relation'] = relation
     if not age:
         if acc_info.get('bdate'):
             age = calc_age(acc_info.get('bdate'))
     if isinstance(age, int) and age in range(12, 120):
         sex = acc_info.get('sex')
         if int(sex) == 2:
-            _portrait['sex'] = 1
-            _portrait['age_from'] = age - 2
-            _portrait['age_to'] = age
+            portrait['sex'] = 1
+            portrait['age_from'] = age - 2
+            portrait['age_to'] = age
         elif sex == 1:
-            _portrait['sex'] = 2
-            _portrait['age_from'] = age - 1
-            _portrait['age_to'] = age + 2
+            portrait['sex'] = 2
+            portrait['age_from'] = age - 1
+            portrait['age_to'] = age + 2
         else:
-            _portrait['sex'] = 0
-            _portrait['age_from'] = age - 1
-            _portrait['age_to'] = age + 1
-        return _portrait
+            portrait['sex'] = 0
+            portrait['age_from'] = age - 1
+            portrait['age_to'] = age + 1
+        return portrait
 
 
 def filter_people(response_obj: dict, user_id: int) -> dict or None:
@@ -233,51 +252,34 @@ def send_photos(api: vk_api.vk_api.VkApiMethod, array: Iterable, user_id: int, k
         ins_into_people(user_id=user_id, candidate_id=user_collage[0])
 
 
-def do_main_logic(bot_pool, features: dict, user_get_response, user_id: int, city_id=None):
+def do_main_logic(bot_pool, features: dict, user_get_response, user_id: int, city_id: int = None):
 
     api_user = main_user.get_api()
     api_bot = main_bot.get_api()
     count = 85
     if features is None:
-        wrong_input = 0
-        while not features:
-            if wrong_input == 0:
-                sender(api_bot, user_id, 'Уточните ваш возраст', keyboard=keyboarding()['cancel'])
-            elif wrong_input == 1:
-                sender(api_bot, user_id, 'Кажется, возраст введен неверное, используйте только цифры'
-                                           ' в диапазоне от 14 до 115')
-            elif wrong_input == 2:
-                sender(api_bot, user_id, 'Не могу выполнить поиск, попробуйте начать новый',
-                       keyboard=keyboarding()['search'])
-                break
-            for thing in bot_pool.listen():
-                if thing.type == VkBotEventType.MESSAGE_NEW:
-                    answer = thing.message.get('text').casefold().strip()
-                    if answer != 'отмена':
-                        if answer.isdigit() and int(answer) in range(14, 116):
-                            answer = int(answer)
-                            features = make_searching_portrait(user_get_response[0], age=answer, city_id=city_id)
-                        wrong_input += 1
+        sender(api_bot, user_id, 'Возраст', keyboard=keyboarding()['cancel'])
+        for thing in bot_pool.listen():
+            if thing.type == VkBotEventType.MESSAGE_NEW:
+                answer = thing.message.get('text').casefold().strip()
+                if answer != 'отмена':
+                    if answer.isdigit() and int(answer) in range(14, 116):
+                        answer = int(answer)
+                        features = make_searching_portrait(user_get_response, age=answer, city_id=city_id)
                         break
                     else:
-                        sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
-                        features = 'to break while loop'
-                        break
+                        sender(api_bot, user_id, 'Вводите цифры от 14 до 115', keyboard=keyboarding()['cancel'])
                 else:
+                    sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
                     break
     if isinstance(features, dict) and len(features) == 5:
         sender(api_bot, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
-        beginning = dt.now()
         found_people = api_user.users.search(sort=0, count=count, **features,
                                              fields='photo_id')
         unique_ids = filter_people(found_people, user_id)
         if unique_ids:
             photos_to_attach = choose_photos(main_user.method, unique_ids)
             send_photos(api_bot, photos_to_attach, user_id, keyboarding)
-            finish = dt.now()
-            with open('search_time.txt', 'a') as f:
-                exec_time = finish - beginning
-                f.write(f"Execution time: {exec_time}, people: {count}\n")
         else:
             sender(api_bot, user_id, 'Извините, никого не найдено', keyboard=keyboarding()['search'])
 
@@ -314,7 +316,7 @@ def main():
                                         city_name = city_event.message['text']
                                         city_id = check_city(country_id, city_name)
                                         if city_id:
-                                            features = make_searching_portrait(user_get[0], city_id=city_id)
+                                            features = make_searching_portrait(user_get, city_id=city_id)
                                             do_main_logic(bot_long_pool, features, user_get, user_id, city_id)
                                             break_outer = True
                                             break
@@ -330,14 +332,22 @@ def main():
                                 city_name = msg.message.get('text')
                                 city_id = check_city(country_id, city_name)
                                 if city_id:
-                                    features = make_searching_portrait(user_get[0], city_id=city_id)
+                                    features = make_searching_portrait(user_get, city_id=city_id)
                                     do_main_logic(bot_long_pool, features, user_get, user_id, city_id)
                                     break
-                elif completeness == 'relation':
-                    ...
-                elif completeness == 'ok':
-                    ...
-                # features = make_searching_portrait(user_get[0])
+                elif completeness == 'relation!':
+                    sender(group_api, user_id, f'Выберите статус\n{status}')
+                    for ev in bot_long_pool.listen():
+                        if ev.type == VkBotEventType.MESSAGE_NEW:
+                            relation = ev.message['text']
+                            if relation.isdigit() and int(relation) in range(1, 9):
+                                features = make_searching_portrait(user_get, relation=relation)
+                                do_main_logic(bot_long_pool, features, user_get, user_id)
+                                break
+
+                elif completeness == 'ok!':
+                    features = make_searching_portrait(user_get)
+                    do_main_logic(bot_long_pool, features, user_get, user_id)
 
 
 if __name__ == '__main__':
