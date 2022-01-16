@@ -4,12 +4,16 @@ import datetime
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 from random import shuffle
 from typing import Callable, Iterable
+from datetime import datetime as dt
 import sqlalchemy.engine.row
 import json
 from typing import Any
 from DB.Create_DB import check_country, check_city, make_and_fill_db, \
     create_tables, clear_user_tables, ins_into_people, ins_into_users, connection
-from tokens import user_access_token, group_access_token, group_id  # Импорт токенов и ID сообщества
+
+user_access_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
+group_access_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'  # ключ доступа бота
+group_id = 209978754  # ID вашего сообщества
 
 
 def usual_msg_prms(user_id: int) -> dict:
@@ -264,6 +268,7 @@ def do_main_logic(api_bot, user_main, bot_pool, features: dict, user_get_respons
 
 
 def main():
+    create_tables()
     clear_user_tables()
     user_main = vk_api.VkApi(token=user_access_token)
     bot_main = vk_api.VkApi(token=group_access_token)
@@ -344,5 +349,4 @@ def main():
 
 
 if __name__ == '__main__':
-    if make_and_fill_db(): print('Bot is ready')  # Можно закомментировать при повторном запуске
     main()
