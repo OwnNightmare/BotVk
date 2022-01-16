@@ -303,7 +303,7 @@ def main():
                                             sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
                                             break_outer = True
                                             break
-                                        city_id = check_city(country_id, req_city)
+                                        city_id = check_city(country_id, req_city.casefold())
                                         if city_id:
                                             features = make_searching_portrait(user_get, city_id=city_id)
                                             do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id, city_id)
@@ -344,5 +344,5 @@ def main():
 
 
 if __name__ == '__main__':
-    if make_and_fill_db(): print('Bot is ready')  # Можно закомментировать при повторном запуске
+    # if make_and_fill_db(): print('Bot is ready')  # Можно закомментировать при повторном запуске
     main()

@@ -118,7 +118,7 @@ def check_country(country_name: str) -> int or None:
 
 
 def check_city(country_id: int, city_name: str) -> int or None:
-    city = city_name.capitalize()
+    city = city_name
     city_id_array = connection.execute(f"""SELECT id FROM cities c
                                     JOIN country_city cc 
                                     ON c.id = cc.city_id
