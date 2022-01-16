@@ -8,28 +8,12 @@ from datetime import datetime as dt
 import sqlalchemy.engine.row
 import json
 from typing import Any
-from DB.Create_DB import check_country, check_city, \
-    create_tables, clear_users_db, ins_into_people, ins_into_users, connection
+from DB.Create_DB import check_country, check_city, make_and_fill_db, \
+    create_tables, clear_user_tables, ins_into_people, ins_into_users, connection
 
-
-status = """
-1 — не женат (не замужем),
-2 — встречается,
-3 — помолвлен(-а),
-4 — женат (замужем),
-5 — всё сложно,
-6 — в активном поиске,
-7 — влюблен(-а),
-8 — в гражданском браке."""
-
-
-
-
-my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
-bot_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'  # ключ доступа бота
+user_access_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
+group_access_token = '3ed6d7a1af9a6f6789559a925b14b30963b1514d943c41926cb88b28ea1091dd321d9ddc494cfa694ba54'  # ключ доступа бота
 group_id = 209978754  # ID вашего сообщества
-main_user = vk_api.VkApi(token=my_token)
-main_bot = vk_api.VkApi(token=bot_token)
 
 
 def usual_msg_prms(user_id: int) -> dict:
@@ -81,6 +65,9 @@ def keyboarding() -> dict:
                    'cancel':
                        """ {"one_time": false, "buttons":
                            [[{"action": {"type": "text", "label": "Отмена"}, "color": "negative"}]]} """,
+                   'back': """{"one_time": false, "buttons":[
+                                [{"action": {"type": "text", "label": "Назад"}, "color": "primary"}, 
+                                {"action": {"type": "text", "label": "Отмена"}, "color": "negative"}]]}""",
                    'empty': """ {"one_time": true, "buttons": []} """
                    }
     return my_keyboard
@@ -250,9 +237,8 @@ def send_photos(api: vk_api.vk_api.VkApiMethod, array: Iterable, user_id: int, k
         ins_into_people(user_id=user_id, candidate_id=user_collage[0])
 
 
-def do_main_logic(bot_pool, features: dict, user_get_response, user_id: int, city_id: int = None):
-    api_user = main_user.get_api()
-    api_bot = main_bot.get_api()
+def do_main_logic(api_bot, user_main, bot_pool, features: dict, user_get_response, user_id: int, city_id: int = None):
+    api_user = user_main.get_api()
     count = 85
     if features is None:
         sender(api_bot, user_id, 'Возраст', keyboard=keyboarding()['cancel'])
@@ -263,21 +249,19 @@ def do_main_logic(bot_pool, features: dict, user_get_response, user_id: int, cit
                     if answer.isdigit() and int(answer) in range(14, 116):
                         answer = int(answer)
                         features = make_searching_portrait(user_get_response, age=answer, city_id=city_id)
-                        print(features)
                         break
                     else:
                         sender(api_bot, user_id, 'Вводите цифры от 14 до 115', keyboard=keyboarding()['cancel'])
                 else:
                     sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
-                    break
+                    return
     if isinstance(features, dict) and len(features) == 5:
-        print(features)
         sender(api_bot, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
         found_people = api_user.users.search(sort=0, count=count, **features,
                                              fields='photo_id')
         unique_ids = filter_people(found_people, user_id)
         if unique_ids:
-            photos_to_attach = choose_photos(main_user.method, unique_ids)
+            photos_to_attach = choose_photos(user_main.method, unique_ids)
             send_photos(api_bot, photos_to_attach, user_id, keyboarding)
         else:
             sender(api_bot, user_id, 'Извините, никого не найдено', keyboard=keyboarding()['search'])
@@ -285,58 +269,83 @@ def do_main_logic(bot_pool, features: dict, user_get_response, user_id: int, cit
 
 def main():
     create_tables()
-    clear_users_db()
-    bot_long_pool = VkBotLongPoll(main_bot, group_id=group_id)
-    group_api = main_bot.get_api()
-    user_api = main_user.get_api()
+    clear_user_tables()
+    user_main = vk_api.VkApi(token=user_access_token)
+    bot_main = vk_api.VkApi(token=group_access_token)
+    bot_long_pool = VkBotLongPoll(bot_main, group_id=group_id)
+    api_bot = bot_main.get_api()
 
     for event in bot_long_pool.listen():
         if event.type == VkBotEventType.MESSAGE_NEW:
             request = event.message.get('text').casefold().strip()
             user_id = event.message.get('from_id')
             if request != 'поиск':
-                sender(group_api, user_id, text=welcome(),
+                sender(api_bot, user_id, text=welcome(),
                        keyboard=keyboarding()['search'])
             elif request == "поиск":
-                user_get = group_api.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'country', 'city'])
+                user_get = api_bot.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'country', 'city'])
                 ins_into_users(id=user_id, name=get_name(user_get))
                 completeness = check(user_get)
                 if completeness == 'country!':
-                    sender(group_api, user_id, 'Страна поиска')
+                    sender(api_bot, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
                     for co_event in bot_long_pool.listen():
                         break_outer = False
                         if co_event.type == VkBotEventType.MESSAGE_NEW:
-                            country_name = co_event.message.get('text').capitalize()
-                            country_id = check_country(country_name)
+                            req_country = co_event.message.get('text')
+                            if req_country.casefold() == 'отмена':
+                                sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
+                                break
+                            country_id = check_country(req_country)
                             if country_id:
-                                sender(group_api, user_id, 'Город')
+                                sender(api_bot, user_id, 'Город', keyboard=keyboarding()['back'])
                                 for city_event in bot_long_pool.listen():
                                     if city_event.type == VkBotEventType.MESSAGE_NEW:
-                                        city_name = city_event.message['text']
-                                        city_id = check_city(country_id, city_name)
-                                        if city_id:
-                                            features = make_searching_portrait(user_get, city_id=city_id)
-                                            do_main_logic(bot_long_pool, features, user_get, user_id, city_id)
+                                        req_city = city_event.message['text']
+                                        if req_city.casefold() == 'назад':
+                                            sender(api_bot, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
+                                            break
+                                        elif req_city.casefold() == 'отмена':
+                                            sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
                                             break_outer = True
                                             break
+                                        city_id = check_city(country_id, req_city)
+                                        if city_id:
+                                            features = make_searching_portrait(user_get, city_id=city_id)
+                                            do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id, city_id)
+                                            break_outer = True
+                                            break
+                                        else:
+                                            sender(api_bot, user_id, 'Не могу найти город, попробуйте '
+                                                          'указать близлежащий крупный', keyboard=keyboarding()['back'])
                                 if break_outer:
                                     break
+                            else:
+                                sender(api_bot, user_id, 'Извините, не могу произвести поиск в этой стране')
                 elif completeness == 'city!':
                     country_name = user_get[0]['country']['title']
                     country_id = check_country(country_name)
                     if country_id:
-                        sender(group_api, user_id, 'Уточните город')
+                        sender(api_bot, user_id, 'Уточните город', keyboard=keyboarding()['cancel'])
                         for msg in bot_long_pool.listen():
                             if msg.type == VkBotEventType.MESSAGE_NEW:
-                                city_name = msg.message.get('text')
-                                city_id = check_city(country_id, city_name)
+                                req_city = msg.message.get('text')
+                                if req_city.casefold() == 'отмена':
+                                    sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
+                                    break
+                                city_id = check_city(country_id, req_city)
                                 if city_id:
                                     features = make_searching_portrait(user_get, city_id=city_id)
-                                    do_main_logic(bot_long_pool, features, user_get, user_id, city_id)
+                                    do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id, city_id)
                                     break
+                                else:
+                                    sender(api_bot, user_id, 'Не могу найти город, попробуйте '
+                                                             'указать близлежащий крупный',
+                                           keyboard=keyboarding()['cancel'])
+                    else:
+                        sender(api_bot, user_id, 'Пока что я не могу выполнить поиск в вашей стране')
                 elif completeness == 'ok!':
                     features = make_searching_portrait(user_get)
-                    do_main_logic(bot_long_pool, features, user_get, user_id)
+                    do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id)
 
 
 if __name__ == '__main__':
