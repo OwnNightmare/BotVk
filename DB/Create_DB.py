@@ -79,6 +79,8 @@ def get_cities_for_country(countries_: dict) -> list:
 
 
 def fill_countries(countries_: dict) -> None:
+    """Заполняет базу данных странами, полученными в get_countries()\n
+    @countries_ : словарь, успешный ответ метода database.getCountries"""
     for country in countries_['items']:
         connection.execute(f"""INSERT INTO countries(id, name)
                             VALUES({country['id']}, '{country['title']}')
@@ -86,6 +88,7 @@ def fill_countries(countries_: dict) -> None:
 
 
 def fill_cities(data: list) -> None:
+    """Заполняет базу данных  городами, полученными в get_cities_for_country()\n"""
     for tup in data:
         for city in tup[1]['items']:
             connection.execute(f"""INSERT INTO cities(id, name)
@@ -94,6 +97,7 @@ def fill_cities(data: list) -> None:
 
 
 def bound_country_city(data: list):
+    """Заполняет таблицу связей стран и городов, на основании данных из в get_cities_for_country()\n"""
     for tup in data:
         for city in tup[1]['items']:
             connection.execute(f"""INSERT INTO country_city
@@ -103,12 +107,13 @@ def bound_country_city(data: list):
 
 
 def clear_user_tables():
+    """Очищает таблицы users и people"""
     connection.execute(f"""DELETE FROM people;
                         DELETE FROM users;""")
 
 
 def check_country(country_name: str) -> int or None:
-
+    """Проверят наличие страны в локальной в БД по названию, при наличии возвращает id страны"""
     country_name = country_name.capitalize()
     country_id_array = connection.execute(f"""SELECT id FROM countries
                                                  WHERE name = '{country_name}' """).fetchone()
@@ -118,6 +123,7 @@ def check_country(country_name: str) -> int or None:
 
 
 def check_city(country_id: int, city_name: str) -> int or None:
+    """Проверят наличие города в локальной в БД по названию, при наличии возвращает id города"""
     city = city_name
     city_id_array = connection.execute(f"""SELECT id FROM cities c
                                     JOIN country_city cc 
@@ -136,10 +142,6 @@ def make_and_fill_db():
     fill_cities(co_ci_array)
     bound_country_city(co_ci_array)
     return True
-
-
-# if __name__ == '__main__':
-#     make_and_fill_db()
 
 
 

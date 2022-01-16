@@ -7,15 +7,14 @@ from typing import Callable, Iterable
 import sqlalchemy.engine.row
 import json
 from typing import Any
-from DB.Create_DB import check_country, check_city, make_and_fill_db, \
-    create_tables, clear_user_tables, ins_into_people, ins_into_users, connection
+from DB.Create_DB import check_country, check_city, make_and_fill_db,\
+    clear_user_tables, ins_into_people, ins_into_users, connection
 from tokens import user_access_token, group_access_token, group_id  # Импорт токенов и ID сообщества
 
 
 def usual_msg_prms(user_id: int) -> dict:
     """Возвращает обязательные параметры для сообщения в виде словаря:\n
-       @user_id - id текущего пользователя ВК.
-        """
+       @user_id - id текущего пользователя ВК"""
 
     params = {'user_id': user_id,
               'random_id': int(time.time() * 1000),
@@ -94,7 +93,10 @@ def get_name(user_get_response: list) -> str:
     return name
 
 
-def check(user_get: list) -> str:
+def check_location(user_get: list) -> str:
+    """Если не получена страна пользователя возвращает: country!
+    Если не получен город возвращает: city!
+    Если полученные все данные возвращает: ok! """
     for user in user_get:
         if not user.get('country'):
             return 'country!'
@@ -103,11 +105,12 @@ def check(user_get: list) -> str:
     return 'ok!'
 
 
-def make_searching_portrait(user_get_response: list, age: int = None, city_id: int = None, relation: int = None) -> dict or None:
-    """ Возвращает критерии поиска людей для текущего польз-ля\n
-    Если возраст None - вычисляет его из полученных данных\n
-    @acc_info - словарь с данными о текущем пользователе
-    @age - возраст пользователя"""
+def make_searching_portrait(user_get_response: list, age: int = None, city_id: int = None, relation: int = None)-> dict:
+    """ Возвращает критерии поиска людей для текущего пользователя\n
+    @user_get_response - успешный ответ метода users.get\n
+    @age - возраст пользователя\n
+    @city_id - ID города
+    @relation - статус пользователя от (0 до 8)"""
 
     acc_info = user_get_response[0]
     portrait = {}
@@ -139,16 +142,16 @@ def make_searching_portrait(user_get_response: list, age: int = None, city_id: i
         return portrait
 
 
-def filter_people(response_obj: dict, user_id: int) -> dict or None:
+def filter_people(users_search_resp: dict, user_id: int) -> dict or None:
     """Возвращает список id страниц, которых еще не видел пользователь\n
     Делает запрос к БД, получая уже записанные id для, \n
     исключает их из принятых в аргументе response_obj \n
-    @response_obj - успешный ответ users.search метода, dict
+    @user_search_resp - успешный ответ метода users.search
     @user_id - ID текущего пользователя"""
 
     filtered_users = []
-    if len(response_obj) > 0:
-        for user in response_obj['items']:
+    if len(users_search_resp) > 0:
+        for user in users_search_resp['items']:
             if user['can_access_closed']:
                 filtered_users.append(user)
         if len(filtered_users) > 0:
@@ -219,6 +222,7 @@ def choose_photos(query_maker, ids: list) -> list:
 
 
 def send_photos(api: vk_api.vk_api.VkApiMethod, array: Iterable, user_id: int, keyboard: Callable = None) -> None:
+
     """ Отправляет фото, заносит отправленные id в БД\n
     @api: api - объект класса  VkApiMethod\n
     @array: список формата [[owner_id, [photo_id1, photo_id2..], ...]]\n
@@ -280,7 +284,7 @@ def main():
             elif request == "поиск":
                 user_get = api_bot.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'country', 'city'])
                 ins_into_users(id=user_id, name=get_name(user_get))
-                completeness = check(user_get)
+                completeness = check_location(user_get)
                 if completeness == 'country!':
                     sender(api_bot, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
                     for co_event in bot_long_pool.listen():
