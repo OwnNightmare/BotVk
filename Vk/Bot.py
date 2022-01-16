@@ -105,7 +105,7 @@ def check_location(user_get: list) -> str:
     return 'ok!'
 
 
-def make_searching_portrait(user_get_response: list, age: int = None, city_id: int = None, relation: int = None)-> dict:
+def make_features(user_get_response: list, age: int = None, city_id: int = None, relation: int = None) -> dict:
     """ Возвращает критерии поиска людей для текущего пользователя\n
     @user_get_response - успешный ответ метода users.get\n
     @age - возраст пользователя\n
@@ -113,33 +113,33 @@ def make_searching_portrait(user_get_response: list, age: int = None, city_id: i
     @relation - статус пользователя от (0 до 8)"""
 
     acc_info = user_get_response[0]
-    portrait = {}
+    features = {}
     if not city_id:
-        portrait['city'] = acc_info.get('city').get('id')
+        features['city'] = acc_info.get('city').get('id')
     else:
-        portrait['city'] = city_id
+        features['city'] = city_id
     if not relation:
-        portrait['status'] = acc_info.get('relation')
+        features['status'] = acc_info.get('relation')
     else:
-        portrait['status'] = relation
+        features['status'] = relation
     if not age:
         if acc_info.get('bdate'):
             age = calc_age(acc_info.get('bdate'))
     if isinstance(age, int) and age in range(12, 120):
         sex = acc_info.get('sex')
         if int(sex) == 2:
-            portrait['sex'] = 1
-            portrait['age_from'] = age - 2
-            portrait['age_to'] = age
+            features['sex'] = 1
+            features['age_from'] = age - 2
+            features['age_to'] = age
         elif sex == 1:
-            portrait['sex'] = 2
-            portrait['age_from'] = age - 1
-            portrait['age_to'] = age + 2
+            features['sex'] = 2
+            features['age_from'] = age - 1
+            features['age_to'] = age + 2
         else:
-            portrait['sex'] = 0
-            portrait['age_from'] = age - 1
-            portrait['age_to'] = age + 1
-        return portrait
+            features['sex'] = 0
+            features['age_from'] = age - 1
+            features['age_to'] = age + 1
+        return features
 
 
 def filter_people(users_search_resp: dict, user_id: int) -> dict or None:
@@ -248,7 +248,7 @@ def do_main_logic(api_bot, user_main, bot_pool, features: dict, user_get_respons
                 if answer != 'отмена':
                     if answer.isdigit() and int(answer) in range(14, 116):
                         answer = int(answer)
-                        features = make_searching_portrait(user_get_response, age=answer, city_id=city_id)
+                        features = make_features(user_get_response, age=answer, city_id=city_id)
                         break
                     else:
                         sender(api_bot, user_id, 'Вводите цифры от 14 до 115', keyboard=keyboarding()['cancel'])
@@ -268,6 +268,23 @@ def do_main_logic(api_bot, user_main, bot_pool, features: dict, user_get_respons
 
 
 def main():
+    """Очищаем таблицы, созданные make_and_fill_db, получаем экземпляры класса VkApi, для работы с API VK,
+начинаем прослушку сервера методом listen(), если событие, случившееся на сервере - новое сообщение
+ (VkBotEventType.MESSAGE_NEW), то получаем id пользователя(далее П) и проверяем текст запроса.\n
+ Если запрос не равен 'поиск' - отправляем приветственное сообщение с инструкцией к боту и клавиатуру с кнопкой
+ 'search'\n Если запрос == 'поиск': исполняем API метод 'users.get', для получения инфы о П.\n
+ В БД записываем ID и Имя П функцией ins_into_users, проверяем указаны ли Страна и Город:
+- если не указана страна(и как следствие город) - запрашиваем ввод страны, отправляем кнопку 'отмены',
+  запускаем вложенный for listen для приема страны;
+- Если проходит 'отмена' - вложенный for разрывается, возврат в главное меню поиска
+ - - если страна в нашей БД - идет запрос города, высылается клавиатура с кнопкой 'назад' для возврата к выбору страны
+  открывается второй вложенный for ... listen, если город найден - id города передается в make_features для формир-я
+  критериев поиска, запускается функция поиска и отправки фото, если город не найден - предлагается ввести более крупный
+  город.
+  Если нет только города: проверяется есть ли указанная в профиле страна в нашей локальной БД, которая сод-ит только 18
+  стран, если есть - запрос и проверка города, если страны нет - в поиске отказывается
+  Если город и страна указаны изначально - переходим к формированию критериев поиска
+    """
     clear_user_tables()
     user_main = vk_api.VkApi(token=user_access_token)
     bot_main = vk_api.VkApi(token=group_access_token)
@@ -284,8 +301,8 @@ def main():
             elif request == "поиск":
                 user_get = api_bot.users.get(user_ids=user_id, fields=['bdate', 'sex', 'relation', 'country', 'city'])
                 ins_into_users(id=user_id, name=get_name(user_get))
-                completeness = check_location(user_get)
-                if completeness == 'country!':
+                location = check_location(user_get)
+                if location == 'country!':
                     sender(api_bot, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
                     for co_event in bot_long_pool.listen():
                         break_outer = False
@@ -309,7 +326,7 @@ def main():
                                             break
                                         city_id = check_city(country_id, req_city.casefold())
                                         if city_id:
-                                            features = make_searching_portrait(user_get, city_id=city_id)
+                                            features = make_features(user_get, city_id=city_id)
                                             do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id, city_id)
                                             break_outer = True
                                             break
@@ -320,7 +337,7 @@ def main():
                                     break
                             else:
                                 sender(api_bot, user_id, 'Извините, не могу произвести поиск в этой стране')
-                elif completeness == 'city!':
+                elif location == 'city!':
                     country_name = user_get[0]['country']['title']
                     country_id = check_country(country_name)
                     if country_id:
@@ -333,7 +350,7 @@ def main():
                                     break
                                 city_id = check_city(country_id, req_city)
                                 if city_id:
-                                    features = make_searching_portrait(user_get, city_id=city_id)
+                                    features = make_features(user_get, city_id=city_id)
                                     do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id, city_id)
                                     break
                                 else:
@@ -342,8 +359,8 @@ def main():
                                            keyboard=keyboarding()['cancel'])
                     else:
                         sender(api_bot, user_id, 'Пока что я не могу выполнить поиск в вашей стране')
-                elif completeness == 'ok!':
-                    features = make_searching_portrait(user_get)
+                elif location == 'ok!':
+                    features = make_features(user_get)
                     do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id)
 
 
