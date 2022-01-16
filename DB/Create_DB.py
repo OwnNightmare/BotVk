@@ -2,7 +2,7 @@ from sqlalchemy import MetaData, Table, Integer, String, ForeignKey,\
     delete, Column, insert, PrimaryKeyConstraint
 import sqlalchemy
 import vk_api
-from pprint import pprint
+from tokens import user_access_token  # Импорт ВК токена пользователя
 
 
 db = 'postgresql://postgres:1710@localhost:5432/vkdb'
@@ -10,8 +10,7 @@ engine = sqlalchemy.create_engine(db)
 connection = engine.connect()
 metadata_obj = MetaData()
 
-my_token = 'c3a240cff79d2ddac8a4e884df9b599090c3d54f166d62f5c2c3768d86a215fe590b7d62bc8a26a13ec15'  # offline level
-api = vk_api.VkApi(token=my_token)
+api = vk_api.VkApi(token=user_access_token)
 api = api.get_api()
 
 
@@ -94,7 +93,7 @@ def fill_cities(data: list) -> None:
                                     ON CONFLICT DO NOTHING""")
 
 
-def bound_country_cities(data: list):
+def bound_country_city(data: list):
     for tup in data:
         for city in tup[1]['items']:
             connection.execute(f"""INSERT INTO country_city
@@ -103,7 +102,7 @@ def bound_country_cities(data: list):
                                     ON CONFLICT DO NOTHING""")
 
 
-def clear_users_db():
+def clear_user_tables():
     connection.execute(f"""DELETE FROM people;
                         DELETE FROM users;""")
 
@@ -129,15 +128,20 @@ def check_city(country_id: int, city_name: str) -> int or None:
         return int(city_id_array[0])
 
 
-if __name__ == '__main__':
-    # create_tables()
-    # countries = get_countries()
-    # co_ci_array = get_cities_for_country(countries)
-    # fill_countries(countries)
-    # fill_cities(co_ci_array)
-    # bound_country_cities(co_ci_array)
+def make_and_fill_db():
+    create_tables()
+    countries = get_countries()
+    co_ci_array = get_cities_for_country(countries)
+    fill_countries(countries)
+    fill_cities(co_ci_array)
+    bound_country_city(co_ci_array)
+    return True
 
-    ...
+
+# if __name__ == '__main__':
+#     make_and_fill_db()
+
+
 
 
 

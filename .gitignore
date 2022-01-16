@@ -15,3 +15,4 @@ Vk/draft.py
 Vk/VK_funcs.py
 Tests/portrait.json
 Vk/logger.log
+__pycache__/

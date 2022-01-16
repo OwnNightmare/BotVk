@@ -1,7 +1,7 @@
 import pytest
 import unittest
-from Vk.VkBoting import usual_msg_prms, make_searching_portrait, filter_people
-from DB.Create_DB import db, engine, connection, clear_users_db, create_tables
+from Vk.Bot import usual_msg_prms, make_searching_portrait, filter_people
+from DB.Create_DB import db, engine, connection, clear_user_tables, create_tables
 
 
 portrait = {
@@ -12,17 +12,17 @@ portrait = {
     "age_to": 29
 }
 
-user_with_bad_bdate = {'id': 222968943, 'first_name': 'Юрий', 'last_name': 'Борисов',
+user_with_bad_bdate = [{'id': 222968943, 'first_name': 'Юрий', 'last_name': 'Борисов',
              'can_access_closed': True, 'is_closed': False, 'sex': 2,
              'bdate': '16.10', 'city': {'id': 72, 'title': 'Краснодар'},
              'relation': 1
-                       }
-user_with_ok_bdate = {
+                       }]
+user_with_ok_bdate = [{
                 'id': 222968943, 'first_name': 'Юрий', 'last_name': 'Борисов',
                 'can_access_closed': True, 'is_closed': False, 'sex': 2,
                 'bdate': '16.10.1995', 'city': {'id': 72, 'title': 'Краснодар'},
                 'relation': 1
-                }
+                }]
 
 search_response = {'items': [
                     {'id': 789456456, 'first_name': 'Анастасия',
@@ -60,7 +60,7 @@ class TestVkApi(unittest.TestCase):
         assert len(filter_people(search_response, 123)) == 1
 
     def tearDown(self) -> None:
-        clear_users_db()
+        clear_user_tables()
 
 
 
