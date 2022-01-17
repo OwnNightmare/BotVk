@@ -221,7 +221,7 @@ def choose_photos(query_maker, ids: list) -> list:
     return owner_and_photos
 
 
-def send_photos(api, array: Iterable, user_id: int) -> None:
+def wrap_photos(api, array: Iterable, user_id: int) -> None:
     """ Отправляет фото, заносит отправленные id в БД\n
     @api: api - объект класса  VkApiMethod\n
     @array: список формата [[owner_id, [photo_id1, photo_id2..], ...]]\n
@@ -231,6 +231,36 @@ def send_photos(api, array: Iterable, user_id: int) -> None:
         sender(api, user_id, text=f"https://vk.com/id{user_collage[0]}", attachment=[i for i in user_collage[1]])
         ins_into_people(user_id=user_id, candidate_id=user_collage[0])
     sender(api, user_id, 'Поиск окончен', keyboard=keyboarding()['search'])
+
+
+def ask_for_country(api, user_id, bot_pool):
+    sender(api, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
+    for event in bot_pool.listen():
+        if event.type == VkBotEventType.MESSAGE_NEW:
+            req_country = event.message.get('text')
+            if req_country.casefold() == 'отмена':
+                sender(api, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
+                return
+            country_id = check_country(req_country)
+            if country_id:
+                return country_id
+            sender(api, user_id, 'Извините, не могу произвести поиск в этой стране')
+
+
+def ask_for_city(api, user_id, bot_pool, country_id):
+    sender(api, user_id, 'Город', keyboard=keyboarding()['back'])
+    for event in bot_pool.listen():
+        if event.type == VkBotEventType.MESSAGE_NEW:
+            req_city = event.message['text']
+            if req_city.casefold() == 'назад':
+                sender(api, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
+                return
+            elif req_city.casefold() == 'отмена':
+                sender(api, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
+                return
+            city_id = check_city(country_id, req_city)
+            if city_id:
+                return city_id
 
 
 def ask_for_age(api_bot, bot_pool, features, user_get_response, user_id, city_id: int = None):
@@ -255,7 +285,7 @@ def ask_for_age(api_bot, bot_pool, features, user_get_response, user_id, city_id
 
 def search_and_send(api_bot, user_main, features: dict, user_id: int, ):
     api_user = user_main.get_api()
-    count = 10
+    count = 15  # Количество людей получаемых в ответе users.search
     if isinstance(features, dict) and len(features) == 5:
         sender(api_bot, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
         found_people = api_user.users.search(sort=0, count=count, **features,
@@ -263,9 +293,10 @@ def search_and_send(api_bot, user_main, features: dict, user_id: int, ):
         unique_ids = filter_people(found_people, user_id)
         if unique_ids:
             photos_to_attach = choose_photos(user_main.method, unique_ids)
-            send_photos(api_bot, photos_to_attach, user_id)
+            wrap_photos(api_bot, photos_to_attach, user_id)
         else:
             sender(api_bot, user_id, 'Извините, никого не найдено', keyboard=keyboarding()['search'])
+            return False
 
 
 def main():
@@ -304,64 +335,31 @@ def main():
                 ins_into_users(id=user_id, name=get_name(user_get))
                 location = check_location(user_get)
                 if location == 'country!':
-                    sender(api_bot, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
-                    for co_event in bot_long_pool.listen():
-                        break_outer = False
-                        if co_event.type == VkBotEventType.MESSAGE_NEW:
-                            req_country = co_event.message.get('text')
-                            if req_country.casefold() == 'отмена':
-                                sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
-                                break
-                            country_id = check_country(req_country)
-                            if country_id:
-                                sender(api_bot, user_id, 'Город', keyboard=keyboarding()['back'])
-                                for city_event in bot_long_pool.listen():
-                                    if city_event.type == VkBotEventType.MESSAGE_NEW:
-                                        req_city = city_event.message['text']
-                                        if req_city.casefold() == 'назад':
-                                            sender(api_bot, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
-                                            break
-                                        elif req_city.casefold() == 'отмена':
-                                            sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
-                                            break_outer = True
-                                            break
-                                        city_id = check_city(country_id, req_city.casefold())
-                                        if city_id:
-                                            features = make_features(user_get, city_id=city_id)
-                                            features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id, city_id)
-                                            if features:
-                                                search_and_send(api_bot, user_main, features, user_id)
-                                            break_outer = True
-                                            break
-                                        else:
-                                            sender(api_bot, user_id, 'Не могу найти город, попробуйте '
-                                                          'указать близлежащий крупный', keyboard=keyboarding()['back'])
-                                if break_outer:
-                                    break
-                            else:
-                                sender(api_bot, user_id, 'Извините, не могу произвести поиск в этой стране')
+                    country_id = ask_for_country(api_bot, user_id, bot_long_pool)
+                    if country_id:
+                        city_id = ask_for_city(api_bot, user_id, bot_long_pool, country_id)
+                        if city_id:
+                            features = make_features(user_get, city_id=city_id)
+                            features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id, city_id)
+                            if features:
+                                result = search_and_send(api_bot, user_main, features, user_id)
+                        else:
+                            sender(api_bot, user_id, 'Не могу найти город, попробуйте '
+                                          'указать близлежащий крупный', keyboard=keyboarding()['back'])
                 elif location == 'city!':
                     country_name = user_get[0]['country']['title']
                     country_id = check_country(country_name)
                     if country_id:
-                        sender(api_bot, user_id, 'Уточните город', keyboard=keyboarding()['cancel'])
-                        for msg in bot_long_pool.listen():
-                            if msg.type == VkBotEventType.MESSAGE_NEW:
-                                req_city = msg.message.get('text')
-                                if req_city.casefold() == 'отмена':
-                                    sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
-                                    break
-                                city_id = check_city(country_id, req_city)
-                                if city_id:
-                                    features = make_features(user_get, city_id=city_id)
-                                    features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id, city_id)
-                                    if features:
-                                        search_and_send(api_bot, user_main, features, user_id)
-                                    break
-                                else:
-                                    sender(api_bot, user_id, 'Не могу найти город, попробуйте '
-                                                             'указать близлежащий крупный',
-                                           keyboard=keyboarding()['cancel'])
+                        city_id = ask_for_city(api_bot, user_id, bot_long_pool, country_id)
+                        if city_id:
+                            features = make_features(user_get, city_id=city_id)
+                            features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id, city_id)
+                            if features:
+                                search_and_send(api_bot, user_main, features, user_id)
+                        else:
+                            sender(api_bot, user_id, 'Не могу найти город, попробуйте '
+                                                     'указать близлежащий крупный',
+                                   keyboard=keyboarding()['cancel'])
                     else:
                         sender(api_bot, user_id, 'Пока что я не могу выполнить поиск в вашей стране')
                 elif location == 'ok!':
