@@ -18,7 +18,7 @@ def usual_msg_prms(user_id: int) -> dict:
 
     params = {'user_id': user_id,
               'random_id': int(time.time() * 1000),
-              'peer_id': group_id * -1}
+              'peer_id': group_id}
     return params
 
 
@@ -223,7 +223,7 @@ def choose_photos(query_maker, ids: list) -> list:
 
 def wrap_photos(api, array: Iterable, user_id: int) -> None:
     """ Отправляет фото, заносит отправленные id в БД\n
-    @api: api - объект класса  VkApiMethod\n
+    @api: - объект класса  VkApiMethod\n
     @array: список формата [[owner_id, [photo_id1, photo_id2..], ...]]\n
     @user_id: ID текущего пользователя\n"""
 
@@ -234,6 +234,12 @@ def wrap_photos(api, array: Iterable, user_id: int) -> None:
 
 
 def ask_for_country(api, user_id, bot_pool):
+    """
+    :param api: объект класса  VkApiMethod
+    :param user_id: ID пользователя ВК
+    :param bot_pool: объект класса VkBotLongPoll
+    :return: country_id
+    """
     sender(api, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
     for event in bot_pool.listen():
         if event.type == VkBotEventType.MESSAGE_NEW:
@@ -247,7 +253,14 @@ def ask_for_country(api, user_id, bot_pool):
             sender(api, user_id, 'Извините, не могу произвести поиск в этой стране')
 
 
-def ask_for_city(api, user_id, bot_pool, country_id):
+def ask_for_city(api, user_id: int, bot_pool, country_id: int):
+    """
+    :param api: объект класса  VkApiMethod
+    :param user_id: ID пользователя ВК
+    :param bot_pool: объект класса VkBotLongPoll
+    :param country_id: ID страны
+    :return: city_id
+    """
     sender(api, user_id, 'Город', keyboard=keyboarding()['cancel'])
     for event in bot_pool.listen():
         if event.type == VkBotEventType.MESSAGE_NEW:
@@ -266,9 +279,18 @@ def ask_for_city(api, user_id, bot_pool, country_id):
                                          'указать близлежащий крупный', keyboard=keyboarding()['cancel'])
 
 
-def ask_for_age(api_bot, bot_pool, features, user_get_response, user_id, city_id: int = None):
+def ask_for_age(api, bot_pool, features: dict, user_get_response: list, user_id, city_id: int = None):
+    """
+    :param api: объект класса  VkApiMethod
+    :param bot_pool: объект класса VkBotLongPoll
+    :param features: словарь с критериями поиска
+    :param user_get_response: успешный ответ API метода users.get
+    :param user_id: ID пользователя ВК
+    :param city_id: ID города
+    :return: features
+    """
     if features is None:
-        sender(api_bot, user_id, 'Возраст', keyboard=keyboarding()['cancel'])
+        sender(api, user_id, 'Возраст', keyboard=keyboarding()['cancel'])
         for thing in bot_pool.listen():
             if thing.type == VkBotEventType.MESSAGE_NEW:
                 answer = thing.message.get('text').casefold().strip()
@@ -278,20 +300,27 @@ def ask_for_age(api_bot, bot_pool, features, user_get_response, user_id, city_id
                         features = make_features(user_get_response, age=answer, city_id=city_id)
                         return features
                     else:
-                        sender(api_bot, user_id, 'Вводите цифры от 14 до 115', keyboard=keyboarding()['cancel'])
+                        sender(api, user_id, 'Вводите цифры от 14 до 115', keyboard=keyboarding()['cancel'])
                 else:
-                    sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
+                    sender(api, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
                     return
     else:
         return features
 
 
-def search_and_send(api_bot, user_main, features: dict, user_id: int, ):
+def search_and_send(api_bot, user_main, features: dict, user_id: int):
+    """
+    :param api_bot: объект класса  VkApiMethod
+    :param user_main: объект класса VkApi, с токеном доступа пользователя
+    :param features: словарь с критериями поиска
+    :param user_id: ID пользователя ВК
+    :return: None
+    """
     api_user = user_main.get_api()
-    count = 15  # Количество людей получаемых в ответе users.search
+    count = 75  # Количество людей получаемых в ответе users.search
     if isinstance(features, dict) and len(features) == 5:
         sender(api_bot, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
-        found_people = api_user.users.search(sort=0, count=count, **features,
+        found_people = api_user.users.search(sort=0, **features, count=count,
                                              fields='photo_id')
         unique_ids = filter_people(found_people, user_id)
         if unique_ids:
@@ -309,16 +338,10 @@ def main():
  Если запрос не равен 'поиск' - отправляем приветственное сообщение с инструкцией к боту и клавиатуру с кнопкой
  'search'\n Если запрос == 'поиск': исполняем API метод 'users.get', для получения инфы о П.\n
  В БД записываем ID и Имя П функцией ins_into_users, проверяем указаны ли Страна и Город:
-- если не указана страна(и как следствие город) - запрашиваем ввод страны, отправляем кнопку 'отмены',
-  запускаем вложенный for listen для приема страны;
-- Если приходит 'отмена' - вложенный for разрывается, возврат в главное меню поиска
- - - если страна в нашей БД - идет запрос города, высылается клавиатура с кнопкой 'назад' для возврата к выбору страны
-  открывается второй вложенный for ... listen, если город найден - id города передается в make_features для формир-я
-  критериев поиска, запускается функция поиска и отправки фото, если город не найден - предлагается ввести более крупный
-  город.
-  Если нет только города: проверяется есть ли указанная в профиле страна в нашей локальной БД, которая сод-ит только 18
+- если не указана страна(и как следствие город) - запрашиваем ввод страны
+- если нет только города: проверяется есть ли указанная в профиле страна в нашей локальной БД, которая сод-ит только 18
   стран, если есть - запрос и проверка города, если страны нет - в поиске отказывается
-  Если город и страна указаны изначально - переходим к формированию критериев поиска в функции make_features
+- если город и страна указаны изначально - спрашиваем начать ли поиск или указать город вручную
     """
     clear_user_tables()
     user_main = vk_api.VkApi(token=user_access_token)
@@ -357,8 +380,8 @@ def main():
                             if features:
                                 search_and_send(api_bot, user_main, features, user_id)
                 elif location == 'ok!':
-                    sender(api_bot, user_id, 'Выполнить поиск в вашем городе: начать, \n'
-                                             'Выбрать другой город: другой', keyboard=keyboarding()['city_choice'])
+                    sender(api_bot, user_id, 'Выполнить поиск в вашем городе:\nначать, \n'
+                                             'Выбрать другой город:\nдругой', keyboard=keyboarding()['city_choice'])
                     for ev in bot_long_pool.listen():
                         if ev.t == VkBotEventType.MESSAGE_NEW:
                             if ev.message['text'].casefold() == 'начать':

@@ -2,10 +2,11 @@ from sqlalchemy import MetaData, Table, Integer, String, ForeignKey,\
     delete, Column, insert, PrimaryKeyConstraint
 import sqlalchemy
 import vk_api
-from tokens import user_access_token  # Импорт ВК токена пользователя
+from tokens import user_access_token, db_address  # Импорт ВК токена пользователя, адрес БД
 
 
 db = 'postgresql://postgres:1710@localhost:5432/vkdb'
+# db = db_address
 engine = sqlalchemy.create_engine(db)
 connection = engine.connect()
 metadata_obj = MetaData()
