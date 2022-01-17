@@ -60,9 +60,9 @@ def keyboarding() -> dict:
                    'cancel':
                        """ {"one_time": false, "buttons":
                            [[{"action": {"type": "text", "label": "Отмена"}, "color": "negative"}]]} """,
-                   'back': """{"one_time": false, "buttons":[
-                                [{"action": {"type": "text", "label": "Назад"}, "color": "primary"}, 
-                                {"action": {"type": "text", "label": "Отмена"}, "color": "negative"}]]}""",
+                   'city_choice': """{"one_time": false, "buttons":[
+                                [{"action": {"type": "text", "label": "Начать"}, "color": "positive"}, 
+                                {"action": {"type": "text", "label": "Другой"}, "color": "primary"}]]}""",
                    'empty': """ {"one_time": true, "buttons": []} """
                    }
     return my_keyboard
@@ -248,19 +248,22 @@ def ask_for_country(api, user_id, bot_pool):
 
 
 def ask_for_city(api, user_id, bot_pool, country_id):
-    sender(api, user_id, 'Город', keyboard=keyboarding()['back'])
+    sender(api, user_id, 'Город', keyboard=keyboarding()['cancel'])
     for event in bot_pool.listen():
         if event.type == VkBotEventType.MESSAGE_NEW:
             req_city = event.message['text']
             if req_city.casefold() == 'назад':
-                sender(api, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
-                return
+                # sender(api, user_id, 'Страна поиска', keyboard=keyboarding()['cancel'])
+                country = ask_for_country(api, user_id, bot_pool)
             elif req_city.casefold() == 'отмена':
                 sender(api, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
                 return
             city_id = check_city(country_id, req_city)
             if city_id:
                 return city_id
+            else:
+                sender(api, user_id, 'Не могу найти город, попробуйте '
+                                         'указать близлежащий крупный', keyboard=keyboarding()['cancel'])
 
 
 def ask_for_age(api_bot, bot_pool, features, user_get_response, user_id, city_id: int = None):
@@ -343,9 +346,6 @@ def main():
                             features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id, city_id)
                             if features:
                                 result = search_and_send(api_bot, user_main, features, user_id)
-                        else:
-                            sender(api_bot, user_id, 'Не могу найти город, попробуйте '
-                                          'указать близлежащий крупный', keyboard=keyboarding()['back'])
                 elif location == 'city!':
                     country_name = user_get[0]['country']['title']
                     country_id = check_country(country_name)
@@ -356,17 +356,26 @@ def main():
                             features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id, city_id)
                             if features:
                                 search_and_send(api_bot, user_main, features, user_id)
-                        else:
-                            sender(api_bot, user_id, 'Не могу найти город, попробуйте '
-                                                     'указать близлежащий крупный',
-                                   keyboard=keyboarding()['cancel'])
-                    else:
-                        sender(api_bot, user_id, 'Пока что я не могу выполнить поиск в вашей стране')
                 elif location == 'ok!':
-                    features = make_features(user_get)
-                    features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id)
-                    if features:
-                        search_and_send(api_bot, user_main, features, user_id)
+                    sender(api_bot, user_id, 'Выполнить поиск в вашем городе: начать, \n'
+                                             'Выбрать другой город: другой', keyboard=keyboarding()['city_choice'])
+                    for ev in bot_long_pool.listen():
+                        if ev.t == VkBotEventType.MESSAGE_NEW:
+                            if ev.message['text'].casefold() == 'начать':
+                                features = make_features(user_get)
+                                features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id)
+                                if features:
+                                    search_and_send(api_bot, user_main, features, user_id)
+                                    break
+                            elif ev.message['text'].casefold() == 'другой':
+                                city_id = ask_for_city(api_bot, user_id, bot_long_pool, user_get[0]['country']['id'])
+                                if city_id:
+                                    features = make_features(user_get, city_id=city_id)
+                                    features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id)
+                                    if features:
+                                        search_and_send(api_bot, user_main, features, user_id)
+                                else:
+                                    break
 
 
 if __name__ == '__main__':
