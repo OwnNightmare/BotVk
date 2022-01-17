@@ -22,7 +22,7 @@ def usual_msg_prms(user_id: int) -> dict:
     return params
 
 
-def sender(api, user_id: int, text: str = None, attachments: Any = None, keyboard=None) -> None:
+def sender(api, user_id: int, text: str = None, attachment: Any = None, keyboard=None) -> None:
     """ Отправляет сообщение пользователю в группу, ничего не возвращает\n
     @api - объект класса  VkApiMethod, обязательный параметр\n
     @user_id -  ВК ID  текущего пользователя, обязательный параметр\n
@@ -34,7 +34,7 @@ def sender(api, user_id: int, text: str = None, attachments: Any = None, keyboar
               'random_id': int(time.time() * 1000),
               'peer_id': group_id * -1}
 
-    api.messages.send(**params, message=text, attachments=attachments, keyboard=keyboard)
+    api.messages.send(**params, message=text, attachment=attachment, keyboard=keyboard)
 
 
 def welcome() -> str:
@@ -221,25 +221,19 @@ def choose_photos(query_maker, ids: list) -> list:
     return owner_and_photos
 
 
-def send_photos(api: vk_api.vk_api.VkApiMethod, array: Iterable, user_id: int, keyboard: Callable = None) -> None:
-
+def send_photos(api, array: Iterable, user_id: int) -> None:
     """ Отправляет фото, заносит отправленные id в БД\n
     @api: api - объект класса  VkApiMethod\n
     @array: список формата [[owner_id, [photo_id1, photo_id2..], ...]]\n
-    @user_id: ID текущего пользователя\n
-    @keyboard - ожидается функция keyboarding"""
+    @user_id: ID текущего пользователя\n"""
 
     for user_collage in array:
-        api.messages.send(**usual_msg_prms(user_id),
-                          attachment=[i for i in user_collage[1]],
-                          message=f"https://vk.com/id{user_collage[0]}",
-                          keyboard=keyboard()['search'])
+        sender(api, user_id, text=f"https://vk.com/id{user_collage[0]}", attachment=[i for i in user_collage[1]])
         ins_into_people(user_id=user_id, candidate_id=user_collage[0])
+    sender(api, user_id, 'Поиск окончен', keyboard=keyboarding()['search'])
 
 
-def do_main_logic(api_bot, user_main, bot_pool, features: dict, user_get_response, user_id: int, city_id: int = None):
-    api_user = user_main.get_api()
-    count = 85
+def ask_for_age(api_bot, bot_pool, features, user_get_response, user_id, city_id: int = None):
     if features is None:
         sender(api_bot, user_id, 'Возраст', keyboard=keyboarding()['cancel'])
         for thing in bot_pool.listen():
@@ -249,12 +243,19 @@ def do_main_logic(api_bot, user_main, bot_pool, features: dict, user_get_respons
                     if answer.isdigit() and int(answer) in range(14, 116):
                         answer = int(answer)
                         features = make_features(user_get_response, age=answer, city_id=city_id)
-                        break
+                        return features
                     else:
                         sender(api_bot, user_id, 'Вводите цифры от 14 до 115', keyboard=keyboarding()['cancel'])
                 else:
                     sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
                     return
+    else:
+        return features
+
+
+def search_and_send(api_bot, user_main, features: dict, user_id: int, ):
+    api_user = user_main.get_api()
+    count = 10
     if isinstance(features, dict) and len(features) == 5:
         sender(api_bot, user_id, 'Идет поиск...', keyboard=keyboarding()['empty'])
         found_people = api_user.users.search(sort=0, count=count, **features,
@@ -262,7 +263,7 @@ def do_main_logic(api_bot, user_main, bot_pool, features: dict, user_get_respons
         unique_ids = filter_people(found_people, user_id)
         if unique_ids:
             photos_to_attach = choose_photos(user_main.method, unique_ids)
-            send_photos(api_bot, photos_to_attach, user_id, keyboarding)
+            send_photos(api_bot, photos_to_attach, user_id)
         else:
             sender(api_bot, user_id, 'Извините, никого не найдено', keyboard=keyboarding()['search'])
 
@@ -276,14 +277,14 @@ def main():
  В БД записываем ID и Имя П функцией ins_into_users, проверяем указаны ли Страна и Город:
 - если не указана страна(и как следствие город) - запрашиваем ввод страны, отправляем кнопку 'отмены',
   запускаем вложенный for listen для приема страны;
-- Если проходит 'отмена' - вложенный for разрывается, возврат в главное меню поиска
+- Если приходит 'отмена' - вложенный for разрывается, возврат в главное меню поиска
  - - если страна в нашей БД - идет запрос города, высылается клавиатура с кнопкой 'назад' для возврата к выбору страны
   открывается второй вложенный for ... listen, если город найден - id города передается в make_features для формир-я
   критериев поиска, запускается функция поиска и отправки фото, если город не найден - предлагается ввести более крупный
   город.
   Если нет только города: проверяется есть ли указанная в профиле страна в нашей локальной БД, которая сод-ит только 18
   стран, если есть - запрос и проверка города, если страны нет - в поиске отказывается
-  Если город и страна указаны изначально - переходим к формированию критериев поиска
+  Если город и страна указаны изначально - переходим к формированию критериев поиска в функции make_features
     """
     clear_user_tables()
     user_main = vk_api.VkApi(token=user_access_token)
@@ -327,7 +328,9 @@ def main():
                                         city_id = check_city(country_id, req_city.casefold())
                                         if city_id:
                                             features = make_features(user_get, city_id=city_id)
-                                            do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id, city_id)
+                                            features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id, city_id)
+                                            if features:
+                                                search_and_send(api_bot, user_main, features, user_id)
                                             break_outer = True
                                             break
                                         else:
@@ -351,7 +354,9 @@ def main():
                                 city_id = check_city(country_id, req_city)
                                 if city_id:
                                     features = make_features(user_get, city_id=city_id)
-                                    do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id, city_id)
+                                    features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id, city_id)
+                                    if features:
+                                        search_and_send(api_bot, user_main, features, user_id)
                                     break
                                 else:
                                     sender(api_bot, user_id, 'Не могу найти город, попробуйте '
@@ -361,7 +366,9 @@ def main():
                         sender(api_bot, user_id, 'Пока что я не могу выполнить поиск в вашей стране')
                 elif location == 'ok!':
                     features = make_features(user_get)
-                    do_main_logic(api_bot, user_main, bot_long_pool, features, user_get, user_id)
+                    features = ask_for_age(api_bot, bot_long_pool, features, user_get, user_id)
+                    if features:
+                        search_and_send(api_bot, user_main, features, user_id)
 
 
 if __name__ == '__main__':
