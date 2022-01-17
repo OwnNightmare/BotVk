@@ -5,8 +5,8 @@ import vk_api
 from tokens import user_access_token, db_address  # Импорт ВК токена пользователя, адрес БД
 
 
-db = 'postgresql://postgres:1710@localhost:5432/vkdb'
-# db = db_address
+# db = 'postgresql://postgres:pwd@localhost:5432/vkdb'
+db = db_address
 engine = sqlalchemy.create_engine(db)
 connection = engine.connect()
 metadata_obj = MetaData()
