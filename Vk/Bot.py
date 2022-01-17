@@ -402,5 +402,5 @@ def main():
 
 
 if __name__ == '__main__':
-    # if make_and_fill_db(): print('Bot is ready')  # Можно закомментировать при повторном запуске
+    if make_and_fill_db(): print('Bot is ready')  # Можно закомментировать при повторном запуске
     main()
