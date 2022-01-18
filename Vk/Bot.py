@@ -62,7 +62,8 @@ def keyboarding() -> dict:
                            [[{"action": {"type": "text", "label": "Отмена"}, "color": "negative"}]]} """,
                    'city_choice': """{"one_time": false, "buttons":[
                                 [{"action": {"type": "text", "label": "Начать"}, "color": "positive"}, 
-                                {"action": {"type": "text", "label": "Другой"}, "color": "primary"}]]}""",
+                                {"action": {"type": "text", "label": "Другой"}, "color": "primary"},
+                                {"action": {"type": "text", "label": "Отмена"}, "color": "negative"}]]}""",
                    'empty': """ {"one_time": true, "buttons": []} """
                    }
     return my_keyboard
@@ -399,6 +400,9 @@ def main():
                                         search_and_send(api_bot, user_main, features, user_id)
                                 else:
                                     break
+                            elif ev.message['text'].casefold() == 'отмена':
+                                sender(api_bot, user_id, 'Поиск отменен', keyboard=keyboarding()['search'])
+                                break
 
 
 if __name__ == '__main__':
